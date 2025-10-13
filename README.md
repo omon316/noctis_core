@@ -1,147 +1,137 @@
----
+Noctis Core
 
-```markdown
-# Noctis Core
+Noctis Core is a unified, modular signal-intelligence orchestration framework.
+It coordinates multiple RF and sensor tools (e.g. KrakenSDR, ADS-B decoders, rtl_433, Kismet, GR-GSM), ingests their outputs into a common schema, stores them across time-series and spatial databases, and presents them through a web dashboard with maps, charts, search, and export capabilities.
 
-**Noctis Core** is a unified, modular signal-intelligence orchestration framework. Its role is to coordinate multiple external RF / sensor tools (e.g. KrakenSDR, ADS-B decoders, rtl_433, Kismet, GR-GSM), ingest their outputs into a common schema, store them in time-series & spatial databases, and present them via a web dashboard with maps, charts, search, and export capabilities.
+🏗 Architecture & Components
 
----
+Noctis Core connects to external tools like KrakenSDR, tar1090, Kismet, rtl_433 and GR-GSM.
+These tools feed data via HTTP, MQTT, CLI or REST into the Noctis Core backend.
+The backend normalizes and stores data in InfluxDB, PostgreSQL/PostGIS and NDJSON/Parquet archives.
+The frontend visualizes this information via a unified web dashboard.
 
-## 🏗 Architecture & Components
+Key modules include:
 
-```
+Collector adapters for ADS-B, rtl_433, Kismet, GSM, Kraken
 
-```
-                            +----------------------+
-                            | External Tools / UIs |
-                            | (Kraken, tar1090,    |
-                            |  Kismet, rtl_433, etc)|
-                            +-----------+----------+
-                                        |
-                                        | (HTTP / MQTT / REST / CLI)
-                                        |
- +---------------+        +--------------v-------------+     +------------------+
- | Frontend (UI)  | <----> | Noctis Core Backend (API)  | <--> | Storage & Exports |
- | Map, charts,   |        | Collectors, Router, Search |     | Influx / PostGIS /|
- | search, exports|        +-----------------------------+     | NDJSON / Parquet  |
- +---------------+                                              +------------------+
-```
+Normalizer to transform raw responses into a unified Observation schema
 
-````
+Storage layers:
 
-**Key modules:**
+Time-series (InfluxDB or Timescale)
 
-- **Collector adapters** for each data source (ADS-B, rtl_433, Kismet, GSM, Kraken)  
-- **Normalizer**: transform raw responses into unified `Observation` schema  
-- **Storage layers**:  
-  1. Time-series DB (InfluxDB or Timescale)  
-  2. Spatial DB (PostgreSQL + PostGIS)  
-  3. Archive files (NDJSON, Parquet)  
-- **REST / WebSocket API** for summary, events, search, health, scan control  
-- **Frontend dashboard**: tiles, map, charts, search, links to external UIs  
-- **Export pipeline**: Live (WebSocket/MQTT/optional CoT) & Post-Scan packages (CoT, GeoJSON, CSV, Parquet, optional SensorThings bundles)  
+Spatial (PostgreSQL + PostGIS)
 
----
+Archive (NDJSON + Parquet)
 
-## 📦 Quick Start
+REST / WebSocket API for summary, events, search, health, scan control
 
-1. Clone this repository  
-2. Setup your Python environment (e.g., `venv`)  
-3. Install backend dependencies:  
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-````
+Frontend dashboard with tiles, map, charts, search and service links
 
-4. Run backend (development mode):
+Export pipeline for live (WebSocket/MQTT/optional CoT) and post-scan data (CoT, GeoJSON, CSV, Parquet, SensorThings)
 
-   ```bash
-   uvicorn noctis_core.backend.app.main:app --reload
-   ```
-5. Serve `frontend/` as static files (e.g., via simple HTTP or via the backend)
-6. Open dashboard in browser, configure collectors & external tool URLs
+📦 Quick Start
 
----
+Clone the repository
 
-## 🧠 Data Model (Observation & Session)
+Create and activate a Python virtual environment
 
-```json
-{
-  "ts": "YYYY-MM-DDThh:mm:ssZ",
-  "session_id": "S2025-10-13-001",
-  "source": "adsb|gsm|ism|bt|kismet|kraken|…",
-  "device_id": "icao-ABC123|cell-…|mac-…",
-  "event": "contact|bcch_update|door_open|present|bearing|health",
-  "value": "number|string|null",
-  "loc": { "lat": 50.9, "lon": 6.9, "alt": 830 },
-  "meta": { "freq": 1090000000, "rssi": -37, "raw": "...", "band": "…" }
-}
-```
+Install backend dependencies using
+pip install -r requirements.txt
 
-A **ScanSession** also stores metadata about each scanning task (start, end, which receivers, config flags, export options, etc.).
+Run the backend server:
+uvicorn noctis_core.backend.app.main:app --reload
 
----
+Serve the frontend/ directory as static files (via backend or simple HTTP server)
 
-## 🔍 Search & Query Capabilities
+Open the dashboard in a browser and configure collector endpoints / external tool URLs
 
-* **Quicksearch / Full-text** over labels, device IDs, metadata
-* **Faceted filters**: by source, event type, session, device, frequency band
-* **Time range** filters
-* **Geo queries**: draw polygon or use radius → filter observations by spatial relation
-* **Saved templates**: e.g. “ADS-B flights over my house in last 24 h”
+🧠 Data Model (Observation & Session)
 
----
+Each collected event is normalized into a JSON observation:
 
-## 🗂 Storage & Export Formats
+ts – ISO timestamp
+session_id – e.g. S2025-10-13-001
+source – adsb, gsm, ism, bt, kismet, kraken
+device_id – identifier (e.g. ICAO, cell ID, MAC)
+event – contact, bcch_update, door_open, present, bearing, health
+value – numeric or string data
+loc – object with lat/lon/alt
+meta – additional metadata like frequency, RSSI, band, raw payload
 
-* **Time-series**: InfluxDB or Timescale (measurements, tags, fields)
-* **Spatial**: PostgreSQL + PostGIS for geometry queries
-* **Archive**: NDJSON & Parquet per session / day
-* **Exports**: CoT ZIP, GeoJSON FeatureCollections, CSV/NDJSON, Parquet, SensorThings bundles
+A ScanSession stores metadata about each scan (start/end time, receivers, flags, export options, etc.).
 
----
+🔍 Search & Query Capabilities
 
-## 🚀 Next Milestones
+Quicksearch / full-text over device IDs and metadata
 
-1. Implement and integrate collector adapters
-2. Connect them to the storage pipelines
-3. Fill out API endpoints with real-data logic
-4. Improve frontend: map, charts, search UI
-5. Build export engine
-6. Add health monitoring, logging, error handling, security
+Faceted filters (source, event, session, frequency band)
 
----
+Time range filtering
 
-## 📚 Standards & References
+Geo search using polygons or radius
 
-* **OGC SensorThings API** (Sensing part) — open, spatially enabled standard for observations. ([Wikipedia][1])
-* **MQTT extension for SensorThings** (publish/subscribe observations) ([developers.sensorup.com][2])
-* **Sensor Observation Service (SOS)**, earlier OGC standard, conceptually related. ([Wikipedia][3])
+Saved query templates (e.g. “ADS-B flights over my location in last 24 h”)
 
----
+🗂 Storage & Export Formats
 
-## 🛡 Security & Network Model
+Time-series: InfluxDB or TimescaleDB
 
-* All backend & collector services bind only to ZeroTier interface (no public exposure)
-* Authentication / authorization for API & UI
-* Health checks, error fallback, logging & provenance
+Spatial: PostgreSQL + PostGIS
 
----
+Archive: NDJSON & Parquet per session/day
 
-## 🏷 License & Contribution
+Exports: CoT ZIP, GeoJSON FeatureCollections, CSV/NDJSON, Parquet, SensorThings bundles
 
-Noctis Core is open for extension. Contributions (plugins, new collector modules, UI enhancements) are welcome.
+🚀 Next Milestones
 
----
+Implement and integrate collector adapters
 
-*End of README*
+Connect them to storage pipelines
 
-```
+Complete API logic for each endpoint
 
-Wenn du willst, kann ich dir auch eine **kompakte Version** dieses README (für die GitHub-Startseite) und eine **ausführliche Dokumentation** (für `docs/`) generieren — möchtest du das?
-::contentReference[oaicite:3]{index=3}
-```
+Improve frontend: map, charts, search UI
 
-[1]: https://en.wikipedia.org/wiki/SensorThings_API?utm_source=chatgpt.com "SensorThings API"
-[2]: https://developers.sensorup.com/tutorials/mqtt/?utm_source=chatgpt.com "SensorThings API - Getting Started with MQTT | SensorUp OGC SensorThings API Developer Centre"
-[3]: https://en.wikipedia.org/wiki/Sensor_Observation_Service?utm_source=chatgpt.com "Sensor Observation Service"
+Build export engine
+
+Add health monitoring, logging, error handling, and security
+
+📚 Standards & References
+
+OGC SensorThings API – open spatial standard for observations
+
+MQTT extension for SensorThings – publish/subscribe for observations
+
+Sensor Observation Service (SOS) – earlier OGC standard in the same domain
+
+🛡 Security & Network Model
+
+All backend and collector services bind only to the ZeroTier interface
+
+Authentication and authorization for API and UI
+
+Health checks, logging, fallback handling, provenance metadata
+
+
+
+-------------------------------------------------------------------
+
+⚠️ Disclaimer
+
+Noctis Core is intended for research and laboratory use only.
+It does not perform or enable active interception, decoding, or manipulation of any protected communication.
+All signal collection, monitoring, and analysis should comply with local laws and frequency regulations.
+The authors and contributors assume no liability for misuse, data collection outside permitted frequency bands, or any activity violating applicable regulations.
+
+Use responsibly — this project is designed for testing, education, and controlled lab environments only.
+
+
+-------------------------------------------------------------------
+
+
+
+🏷 License & Contributions
+
+Noctis Core is open for extension.
+Contributions such as new collectors, UI modules, or integrations are welcome.
