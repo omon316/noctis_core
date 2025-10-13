@@ -45,3 +45,20 @@ uvicorn noctis_core.backend.app.main:app --reload
 # 5️⃣ Serve the frontend
 cd frontend
 python3 -m http.server 8080
+
+# Then open http://localhost:8080
+
+
+🧠 Data Model
+
+Each collected event is normalized into a standard Observation object:
+
+Field	Description
+ts	ISO timestamp
+session_id	e.g. S2025-10-13-001
+source	adsb, gsm, ism, bt, kismet, kraken
+device_id	Unique identifier (ICAO, cell ID, MAC, etc.)
+event	contact, bcch_update, door_open, present, bearing, health
+value	Numeric or string payload
+loc	{ lat, lon, alt }
+meta	Metadata: frequency, RSSI, band, raw payload
