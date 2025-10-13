@@ -1,8 +1,3 @@
-Hier ist eine **optisch ansprechende, klar strukturierte und professionell formulierte `README.md`** für dein GitHub-Repository **Noctis Core** — inklusive Emoji-Dekoration, Markdown-Formatierung und sauberer Struktur.
-Sie ist so gestaltet, dass sie auf GitHub sofort gut lesbar und attraktiv aussieht.
-
----
-
 ````markdown
 # 🌌 Noctis Core
 
@@ -157,9 +152,4 @@ New collectors, UI modules, integrations, or documentation improvements are high
 > Made with ❤️ by signal intelligence enthusiasts
 > *“Observe, not interfere.”*
 
-```
-
----
-
-Möchtest du, dass ich das README zusätzlich **ins Deutsche übersetze** (z. B. für ein zweisprachiges GitHub-Projekt), oder soll es **ausschließlich auf Englisch** bleiben, wie hier?
 ```
