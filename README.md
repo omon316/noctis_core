@@ -1,9 +1,7 @@
 ````markdown
 # 🌌 Noctis Core
 
-**Noctis Core** is a **unified, modular signal-intelligence orchestration framework**.  
-It coordinates multiple RF and sensor tools (e.g. KrakenSDR, ADS-B decoders, rtl_433, Kismet, GR-GSM), ingests their outputs into a common schema, stores them across time-series and spatial databases, and presents them through a rich web dashboard with maps, charts, search, and export capabilities.
-
+Noctis Core is a modular data-collection and visualization platform designed to orchestrate multiple RF- and sensor-based tools and It provides a unified interface to launch, monitor, and aggregate results from these systems into a structured, searchable, and visually rich dashboard.
 ---
 
 ## 🏗️ Architecture & Components
