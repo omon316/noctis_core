@@ -88,6 +88,24 @@ try:
 except ImportError as e:
     MAP_API_AVAILABLE = False
     print(f"⚠️ Map API nicht verfügbar: {e}")
+    
+    # Import Devices API
+try:
+    from api.devices_api import (
+        get_device_directory,
+        get_device_details,
+        get_device_timeline,
+        search_devices,
+        tag_device,
+        get_device_tags,
+        remove_device_tags,
+        export_devices,
+        get_device_aggregations
+    )
+    DEVICES_API_AVAILABLE = True
+except ImportError as e:
+    DEVICES_API_AVAILABLE = False
+    print(f"⚠️ Devices API nicht verfügbar: {e}")
 
 # ========================= FLASK APP =========================
 
@@ -526,6 +544,108 @@ def map_all():
     
     device_filter = request.args.get('filter', 'all')
     return jsonify(get_all_map_data(device_filter))
+    
+@app.route('/api/devices/directory')
+def devices_directory():
+    """Device directory with filters and pagination"""
+    if not DEVICES_API_AVAILABLE:
+        return jsonify({"error": "Devices API not available"}), 503
+    
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    time_filter = request.args.get('time_filter', None)
+    manufacturer = request.args.get('manufacturer', None)
+    device_type = request.args.get('device_type', None)
+    status = request.args.get('status', None)
+    search_query = request.args.get('search', None)
+    sort_by = request.args.get('sort_by', 'last_seen')
+    sort_order = request.args.get('sort_order', 'desc')
+    
+    return jsonify(get_device_directory(
+        page=page,
+        limit=limit,
+        time_filter=time_filter,
+        manufacturer=manufacturer,
+        device_type=device_type,
+        status=status,
+        search_query=search_query,
+        sort_by=sort_by,
+        sort_order=sort_order
+    ))
+
+@app.route('/api/devices/<mac>')
+def device_details(mac):
+    """Get detailed information about a single device"""
+    if not DEVICES_API_AVAILABLE:
+        return jsonify({"error": "Devices API not available"}), 503
+    
+    return jsonify(get_device_details(mac))
+
+@app.route('/api/devices/<mac>/timeline')
+def device_timeline(mac):
+    """Get device timeline (RSSI, positions over time)"""
+    if not DEVICES_API_AVAILABLE:
+        return jsonify({"error": "Devices API not available"}), 503
+    
+    timerange = request.args.get('timerange', '24h')
+    return jsonify(get_device_timeline(mac, timerange))
+
+@app.route('/api/devices/search')
+def api_search_devices():
+    """Search devices by MAC, name, or manufacturer"""
+    if not DEVICES_API_AVAILABLE:
+        return jsonify({"error": "Devices API not available"}), 503
+    
+    query = request.args.get('q', '')
+    limit = request.args.get('limit', 20, type=int)
+    
+    if not query:
+        return jsonify({"error": "Query parameter 'q' required"}), 400
+    
+    return jsonify(search_devices(query, limit))
+
+@app.route('/api/devices/<mac>/tags', methods=['GET', 'POST', 'DELETE'])
+def device_tags(mac):
+    """Manage device tags"""
+    if not DEVICES_API_AVAILABLE:
+        return jsonify({"error": "Devices API not available"}), 503
+    
+    if request.method == 'GET':
+        return jsonify(get_device_tags(mac))
+    
+    elif request.method == 'POST':
+        tags = request.json.get('tags', [])
+        return jsonify(tag_device(mac, tags))
+    
+    elif request.method == 'DELETE':
+        return jsonify(remove_device_tags(mac))
+
+@app.route('/api/devices/export')
+def devices_export():
+    """Export device directory"""
+    if not DEVICES_API_AVAILABLE:
+        return jsonify({"error": "Devices API not available"}), 503
+    
+    format_type = request.args.get('format', 'json')
+    time_filter = request.args.get('time_filter', None)
+    
+    filters = {}
+    if request.args.get('manufacturer'):
+        filters['manufacturer'] = request.args.get('manufacturer')
+    if request.args.get('device_type'):
+        filters['device_type'] = request.args.get('device_type')
+    if request.args.get('status'):
+        filters['status'] = request.args.get('status')
+    
+    return jsonify(export_devices(format_type, time_filter, filters))
+
+@app.route('/api/devices/aggregations')
+def devices_aggregations():
+    """Get aggregated device statistics"""
+    if not DEVICES_API_AVAILABLE:
+        return jsonify({"error": "Devices API not available"}), 503
+    
+    return jsonify(get_device_aggregations())
 
 # ========================= MAIN =========================
 

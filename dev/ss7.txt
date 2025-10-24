@@ -1,0 +1,125 @@
+Kurz: **Ja — im Labor lässt sich SS7-Interrogation simulieren und betreiben**, aber **nur** mit einer vollständig abgeschotteten Testumgebung (eigene Core-Netz-Elemente oder Emulation). Direkter Zugriff auf reale SS7-Netze oder Abfragen echter Netze ist rechtlich hochriskant/illegal in den meisten Ländern. Ich erkläre kurz was technisch nötig ist, welche Komponenten du brauchst, wie du das in Noctis einbindest und welche rechtlichen/sicherheitsmäßigen Vorsichtsmaßnahmen zwingend sind.
+
+---
+
+# 1) Was heißt „SS7 Interrogation“ technisch?
+
+SS7-Interrogation = Signalisierungs-Nachrichten (MTP/SCCP/TCAP → MAP) zwischen Netz-Elementen (z. B. MSC ↔ HLR, VLR, SCP). Typische MAP-Operationen: LocationRequest/IMSI attach, SendRoutingInfo, InsertSubscriberData, etc.
+Für Labortests erzeugst/empfängst du MAP/TCAP-Nachrichten — das ist **Signalling-Layer**, nicht Funk-Air-Interface (das macht gr-gsm).
+
+---
+
+# 2) Was du für ein Labor-Setup brauchst
+
+(alles isoliert: Faraday-Cage / VLAN / physikalisch abgeschottet)
+
+A) **GSM Air-Interface (optional)**
+
+* RTL/Soapy SDR + gr-gsm / OpenBSC / OsmoBTS etc. — wenn du komplette End-to-end testen willst (SIM ↔ BTS ↔ MSC ↔ HLR).
+
+B) **GSM Core / Emulation**
+
+* **MSC** (Mobile Switching Center) — z. B. OsmoMSC (Osmocom) oder andere OpenBSC/Osmo-Komponenten.
+* **HLR/HSS** (Home Location Register) — OsmoHLR oder HLR-Emulator.
+* **VLR / SCP** je nach Szenario (oft in MSC integriert).
+
+C) **SS7 / SIGTRAN Stack**
+
+* Implementierung von MTP/SCCP/TCAP/MAP über SIGTRAN (SCTP/M3UA) — es gibt Open-Source SS7/SIGTRAN Bibliotheken und kommerzielle Emulatoren. Beispiele/Optionen:
+
+  * Open SS7 projects / stacks (historisch mehrere Projekte; Verfügbarkeit variiert)
+  * libss7 / SIGTRAN implementations (je nach Distribution)
+  * Kommerzielle SS7/SIGTRAN Emulators (robuster, dokumentiert)
+    (→ du solltest ein konkretes Stack/Emulator wählen, das SIGTRAN/M3UA + TCAP/MAP unterstützt)
+
+D) **STP/Route-Plane (optional)**
+
+* Für komplexere Szenarien ein Signalling-Transfer-Point / Routing (man kann auch direkt point-to-point verbinden in Lab).
+
+E) **Monitoring / Decoding**
+
+* **Wireshark** mit SS7/MAP/TCAP dissectors (SCTP/M3UA/TCAP/MAP dekodierbar)
+* Logs / PCAPs für Forensik
+
+F) **Test SIMs / Subscriber Data**
+
+* Eigene Test-Subscriber in HLR; niemals echte Netzteilnehmer.
+
+---
+
+# 3) Wie du Tools steuern / starten und Daten in Noctis bringen kannst
+
+Du willst keine neuen SS7-Tools entwickeln — also: orchestriere existierende stacks/processes and ingest their output.
+
+1. **Start/Stop / Orchestration**
+
+   * Werkzeuge/Stacks laufen als Prozesse oder in Containern. Noctis kann sie via an Adapter starten/stoppen (subprocess / docker) — analog zur gr-gsm-Integration, siehe Pattern earlier.
+   * Provide an adapter interface: `start(params)`, `stop()`, `status()`, `tail_logs()`.
+
+2. **Data capture (how to ingest)**
+
+   * **PCAP/SCTP captures**: capture SIGTRAN traffic to pcap; Wireshark dissector shows MAP/TCAP fields. Noctis Worker parses PCAP (via tshark/libpcap) or reads pre-extracted JSON (tshark `-T json`) → normalize to DTOs.
+   * **Stack logs / stdout**: many stacks can be configured to log decoded MAP/TCAP messages (text/JSON). Tail stdout and parse events.
+   * **Direct API / hooks**: some SS7 emulators expose management APIs or logging hooks — Noctis subscribes to those (HTTP/WS) for real-time ingestion.
+
+3. **DTOs to store** (masking by default):
+
+   * `ss7_event`: `{ ts, session_id, src, dst, m3ua_info, tcap_dialogue_id, map_opcode, payload_fields }`
+   * Example fields: `imsi?`, `msisdn?`, `mcc_mnc`, `lac`, `cid`, `response_codes`, `rssi?` (if correlated with air interface)
+   * **Always** store sensitive identifiers hashed by default (IMSI/MSISDN) and allow admin unmasking.
+
+4. **Processing in Noctis**
+
+   * Event ingestion pipeline: validation → dedupe → persist → alert rules (watchlist IMSI/TMSI) → stats (unique IMSIs, MAP op counts).
+   * Correlate with gr-gsm events (if you run air interface too) by timestamp & cell identifiers.
+
+---
+
+# 4) Praktisches Vorgehen / Architekturvorschlag (Lab)
+
+1. **Network isolation**: All SS7/SIGTRAN nodes on isolated VLAN or inside Faraday cage. No internet connectivity.
+2. **Deploy components in Docker**: Osmo components + chosen SS7 stack + STP (if needed) each in container.
+3. **Configure HLR with test subscribers**.
+4. **Run gr-gsm/OpenBSC** (optional) to simulate radio side, register test MS.
+5. **Use SS7 stack/emulator** to send MAP queries (interrogations) against your HLR/MSC.
+6. **Capture SIGTRAN (SCTP/M3UA) with tcpdump/tshark**; feed pcap/json to Noctis adapter.
+7. **Parse events** into Noctis, present in UI, enforce redaction & audit.
+
+---
+
+# 5) Tools / Projects you can try for SS7 emulation / stacks
+
+(Verfügbarkeit & maturity vary — check latest releases and docs before use)
+
+* **Osmocom Suite** (OpenBSC / OsmoBSC / OsmoMSC / OsmoHLR): useful to simulate GSM core + HLR/MSC.
+* **SIGTRAN / SS7 stacks**: there are open implementations and academic/legacy OpenSS7 projects; for reliability, commercial SS7 emulators exist (often used in test labs).
+* **tshark/Wireshark**: decode SCTP/M3UA/TCAP/MAP from captures — essential for validation.
+* **ss7mapd / libss7** (various libs exist) — investigate current maintained implementations.
+
+(Ich nenne bewusst keine einzelne „miraculously perfect“ OSS-SS7-Stack, weil deren Support/maintenance stark schwankt — für ein Lab ist oft eine kommerzielle emulator/stack die stabilste Option.)
+
+---
+
+# 6) Risiken & Legal / Operational Constraints (unbedingt beachten)
+
+* **Hohes rechtliches Risiko** beim Zugriff auf reale SS7-Netze oder beim Aussenden von Signalisierung in öffentlichen Frequenzen/nets. Nur Lab/isolated.
+* **Interception & Data sensitivity**: IMSI/MSISDN sind hochsensible IDs — Default: Hash/Redact.
+* **Interoperability**: different SS7 stacks have different logging formats — need robust parsers.
+* **Complexity**: SS7 stack + SIGTRAN routing + GSM core is nontrivial; expect engineering time.
+
+---
+
+# 7) Fazit / Empfehlung in 3 Schritten
+
+1. **Ja**, SS7 interrogation ist im Labor möglich — aber **nur** in einer isolierten Testumgebung mit emulierten core-elements.
+2. **Pragmatischer Start**: setze Osmocom OpenBSC/OsmoMSC + HLR in Docker + pick an SS7/SIGTRAN stack (or a commercial emulator for stability). Use tshark to produce JSON and hook Noctis adapter to ingest.
+3. **Safety first**: Faraday cage / VLAN isolation, test SIMs, redaction & audit baked into Noctis. Legal clearance before any non-lab activity.
+
+---
+
+Wenn du willst, erstelle ich jetzt:
+
+* a) ein **Konfig-Blueprint** (Liste der Docker-Services / Ports / routing) für ein Lab-SS7-Setup, **oder**
+* b) eine **Adapter-Spec** (endpoints, expected log lines / tshark JSON fields → DTO mapping) damit Claude das Noctis-Adaptermodul implementieren kann.
+
+Welche der beiden möchtest du jetzt?

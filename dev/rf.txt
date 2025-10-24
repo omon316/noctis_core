@@ -1,0 +1,378 @@
+Super — hier ist die vollständige, strukturierte **Feature-Liste für „Noctis RF“**, abgestimmt auf die Tools, die du nutzen willst (`rtl_power / fftw / soapy_power`, `rtl_433`, `dump1090`, `GQRX`, `gr_gsm` + `gsmevil2`) und so formuliert, dass **Claude** die Implementierung direkt daraus ableiten kann.
+
+Ich habe die Liste in klare Bereiche unterteilt: **Core**, **Tool-Adapters**, **Data Products**, **API / Endpoints (spec-level)**, **UI / UX**, **Telemetry & Observability**, **Security / Privacy / Legal**, **Exports**, **Tests & Acceptance**, und **Extensibility**.
+
+---
+
+# Noctis RF — Feature-Liste (implementierungs-ready)
+
+## A — Core RF Module
+
+1. **RF Session Management**
+
+   * Start/Stop Sessions (states: `created`, `running`, `stopping`, `completed`, `failed`)
+   * Session parameters: `profile`, `adapters[]`, `mode` (continuous | timed), `duration_sec?`, `notes?`
+   * Session ID: time-sortable `ulid`/`uuidv7`
+   * Session lifecycle audit (who/when/params)
+
+2. **Profiles**
+
+   * Predefined: `2.4_GHZ_ISM`, `5_GHZ_WIFI`, `ISM_433`, `ISM_868`
+   * Custom: `center_freq`, `bandwidth`, `sample_rate`, `fft_size`, `duty_cycle`, `gain_mode`
+   * Profile persistence (save/load profiles)
+
+3. **Adapter Management**
+
+   * Adapter DTO: `id`, `name`, `driver`, `capabilities{min_freq,max_freq,max_bw}`, `health{ok|warn|error}`, `last_seen_at`
+   * List/Discover adapters (SoapyRemote, rtl_tcp, local devices)
+   * Hotplug: detect new adapters, but require explicit attach to session
+
+4. **Session Controls & Rules**
+
+   * Max concurrent RF sessions configurable (default 1)
+   * Max duration default (e.g., 3600s) with override option
+   * Cooldown between session restarts (configurable)
+   * Fail-fast: stop on persistent overruns (config threshold)
+
+---
+
+## B — Tool Adapters (ready-to-plug for each external program)
+
+> Each adapter implements a common interface: `start(session_params)`, `stop(session_id)`, `status(session_id)`, `stream_out()` (frame/JSON), `snapshot(session_id)`.
+
+1. **rtl_power / rtl_power_fftw / soapy_power**
+
+   * Control: start/stop scans, set start/stop freq, resolution, step size, dwell
+   * Output: CSV or stdout lines (freq, dBm) → Ingest into Occupancy pipeline
+   * Integration: spawn as subprocess or via Soapy wrapper; monitor stdout/file with inotify
+
+2. **rtl_433**
+
+   * Control: start/stop, set device, protocol filters, decode options
+   * Output: JSON over stdout (sensor events) → Ingest as events (`rf_sensor_event`)
+   * Integration: run in Docker/subprocess; parse JSON lines; map protocols to DTOs
+
+3. **dump1090 / readsb**
+
+   * Control: start/stop, configure receiver, set network output
+   * Output: JSON HTTP endpoints or WebSocket (aircraft positions) → Ingest aircraft stream
+   * Integration: poll HTTP JSON or subscribe to socket; store tracks/events
+
+4. **GQRX**
+
+   * Control: frequency/gain/mode via TCP remote port (7356)
+   * Output: limited spectrum data (requires additional setup for I/Q or FFT output)
+   * Integration: Use as control-only adapter; prefer SDRangel/SDR++ for data planes
+
+5. **gr-gsm / gsmevil2**
+
+   * Control: start/stop scanner scripts / flowgraphs with args (freq range, gain)
+   * Output: STDOUT logs, PCAPs, PDU files, optional ZMQ stream → parse IMSI/Cell events
+   * Integration: Process-adapter (subprocess) for MVP; optional Python API flowgraph control later
+
+---
+
+## C — Data Products (what Noctis stores & serves)
+
+1. **Occupancy Series**
+
+   * Schema: `session_id, ts_bucket, freq_bin_hz, occupancy_percent, power_dbm_avg, power_dbm_p95`
+   * Time-binned aggregation (configurable bucket sizes: 1s, 10s, 1m)
+
+2. **Waterfall Frames (downsampled)**
+
+   * Schema: `session_id, ts, freq_start, freq_end, power_array[]` (compressed/encoded)
+   * Storage: only downsampled/aggregated frames persisted to limit size
+
+3. **Snapshots**
+
+   * Single-frame captures with metadata (profile, adapter, ts, fft_params)
+   * Listable, viewable, deletable
+
+4. **RF Events (decoded sensors / aircraft / gsm / anomalies)**
+
+   * Generic DTO: `event_type`, `ts`, `source_tool`, `session_id`, `meta{}, data{}`
+   * Examples: `rtl_433.sensor_reading`, `dump1090.aircraft_pos`, `grgsm.imsi_seen`, `anomaly.spike`
+
+5. **Anomaly Flags**
+
+   * Derived flags: `spike`, `broadband_event`, `periodic_pulses` with severity/confidence
+   * Persisted with source frames & trigger thresholds
+
+6. **Telemetry**
+
+   * `frames_total`, `overruns`, `dropped_samples`, `cpu_load`, `duration_sec`, `last_heartbeat`
+
+---
+
+## D — API Endpoints (spec-level, for Claude to implement)
+
+1. `/api/rf/sessions` (POST) → start session (body: profile, adapters, mode, duration)
+2. `/api/rf/sessions` (GET) → list sessions (paging, filter by state/profile)
+3. `/api/rf/sessions/{id}` (GET) → session detail (state, telemetry, last_heartbeat)
+4. `/api/rf/sessions/{id}/stop` (POST) → stop session (idempotent)
+5. `/api/rf/adapters` (GET) → list adapters + health
+6. `/api/rf/profiles` (GET/POST/PUT/DELETE) → manage profiles
+7. `/api/rf/sessions/{id}/snapshot` (POST) → take snapshot
+8. `/api/rf/occupancy` (GET) → query occupancy time-series (filters: session_id, from,to, freq_range, bucket)
+9. `/api/rf/waterfall` (GET) → fetch downsampled waterfall frames (cursor/paging)
+10. `/api/rf/events` (GET) → stream/search RF events (type, tool, time window)
+11. `/api/rf/alerts` (POST/GET) → create/list alert rules for RF (e.g., occupancy threshold)
+12. `/api/rf/export` (POST) → request export (delegates to central exports module) with params: `source=rf, session_id?, from,to, format, compress, hash_mac?`
+
+All endpoints use standard DTO/Envelope (ok/error), paging via `limit/cursor`.
+
+---
+
+## E — UI / UX (templates + JS hooks)
+
+1. **RF Dashboard (templates/rf.html)**
+
+   * Control bar: Start (profile + adapters) | Stop | Mode (timed | until stop) | Remaining time | Health badge
+   * Heartbeat, Frames/sec, Overrun counter, CPU Load
+   * Quick export shortcut (deep-link to Exports with prefilled params)
+
+2. **Live View**
+
+   * Waterfall viewer (matplotlib-like client canvas; pan/zoom freq/time)
+   * Occupancy strip/heatmap with selectable freq range
+   * Snapshot browser (thumbnails) with metadata
+
+3. **Sessions List**
+
+   * Table of sessions with states, profile, adapter, devices, actions (stop, snapshot, export, view)
+
+4. **Events Explorer**
+
+   * Live feed (SSE/WebSocket) and historical search (filter by type/tool/time)
+   * Detail pane for events (raw payload, linked snapshot/frame)
+
+5. **Alerts & Rules UI**
+
+   * Simple rule builder: band, threshold, duration, severity
+   * Rule history (triggered alerts, ack/resolve)
+
+---
+
+## F — Telemetry & Observability
+
+1. **Metrics** (Prometheus-style)
+
+   * `noctis_rf_sessions_started_total`, `_completed_total`, `_failed_total`
+   * `noctis_rf_frames_total`, `noctis_rf_overruns_total`, `noctis_rf_dropped_total`
+   * Latencies: API start/stop, snapshot time
+2. **Logs**
+
+   * Start/Stop audit logs, adapter health changes, export requests
+3. **Healthchecks**
+
+   * Per-adapter health endpoint, per-session heartbeat, system-level RF-worker status
+
+---
+
+## G — Security, Privacy, Legal (must-have)
+
+1. **Auth**: Bearer tokens; scope `rf:control`, `rf:view`, `rf:export`
+2. **Redaction**: default masking/hashing for sensitive decoded data (e.g., IMSI) with admin opt-in to reveal
+3. **Audit**: all start/stop/export actions logged with user, timestamp, params
+4. **Operational Safeguards**: require lab-mode toggle for GSM operations; show legal notice on start
+5. **Isolation**: recommend Docker + network isolation; Faraday cage for over-the-air tests
+
+---
+
+## H — Exports (delegated to central Exports module)
+
+1. Export types supported: `occupancy_csv`, `waterfall_chunked`, `snapshot_zstd`, `events_json`
+2. Export request stores audit entry and returns presigned URL / stream
+3. Large exports: asynchronous job + notification when ready
+4. Exports support compression (gz/zstd) and optional redaction flags
+
+---
+
+## I — Tests & Acceptance Criteria
+
+1. **Session lifecycle tests**
+
+   * Start -> running -> stop -> completed; telemetry accurate
+2. **Adapter tests**
+
+   * Attach/detach, health transitions, hotplug detection
+3. **Data product tests**
+
+   * Occupancy aggregation correctness (binning tests), waterfall integrity, snapshot fidelity
+4. **Tool adapter tests**
+
+   * rtl_power: CSV ingestion lines → occupancy rows
+   * rtl_433: JSON lines → rf_event ingestion
+   * dump1090: aircraft JSON → track ingestion
+   * gr_gsm/gsmevil2: IMSI/cell events correctly parsed & redacted
+5. **Export test**
+
+   * Request export -> audit entry -> file content schema correct
+6. **Safety tests**
+
+   * Illegal GSM start blocked unless lab-mode enabled
+
+---
+
+## J — Extensibility & Plug-in Model
+
+1. **Adapter Interface**: standardized Python interface; new adapters implement `start/stop/status/stream/snapshot`
+2. **Tool Registry**: `rf_adapters.yml` with metadata and default params
+3. **Worker Model**: pluggable ingestion workers (file, stdout, socket) with common parser pattern
+4. **Versioning & Schema**: API v1; DTO version in payloads to allow parser evolution
+
+---
+
+# Integration notes per selected tool (quick mapping)
+
+* **rtl_power / fftw / soapy_power** → best for Occupancy bulk scans (CSV ingestion)
+* **rtl_433** → direct JSON sensor events ingestion (low-latency)
+* **dump1090** → aircraft tracks via HTTP JSON or socket
+* **GQRX** → control-only; prefer SDRangel/SDR++ for data plane
+* **gr_gsm / gsmevil2** → parse STDOUT / PCAP for GSM events; require lab-mode + redaction
+
+---
+
+Wenn du möchtest, formatiere ich das jetzt in ein **Issue-Template** für Claude: `Noctis RF — Feature Spec` (Markdown), inklusive Akzeptanzkriterien und Test-Cases pro Endpoint — dann kann Claude direkt PRs/Implementations beschreiben oder Tickets erzeugen. Soll ich das machen?
+
+
+
+
+
+
+gr_gsm und gsm_evil2
+---
+
+# 1) Kurzes Sicherheits-/Legal-Reminder (wichtig)
+
+Alles, was GSM-Signale, IMSI, Inhalte oder aktive Manipulation betrifft, kann rechtlich heikel sein. Du hast gesagt *Laborbetrieb* — trotzdem:
+
+* prüfe lokale Gesetze/Compliance, Betriebsfrequenzen und Genehmigungen;
+* arbeite idealerweise in abgeschirmter Umgebung (Faraday-Käfig) und/oder mit Test-SIMs und eigenen BTS-Setups;
+* dokumentiere Audit/Who/When in Noctis (wer hat was gestartet).
+
+Wenn du willst, nenne ich typische rechtliche Punkte für DE (ohne Rechtsberatung).
+
+---
+
+# 2) Was die Tools liefern / wie sie laufen (Kurz)
+
+* **gr-gsm**: GNU Radio-basierte GSM-Tools (Scanner, Decoder). Wird typischerweise per Kommandozeile oder Python-Flowgraph gestartet; liefert Decodes, bursts, ggf. PCAP/PDUs. Bindable via Python (GNU Radio / gr-bindings) oder ZMQ/STDOUT/Files.
+* **gsmevil2**: Tool-Sammlung (auf gr-gsm aufbauend) mit Skripten zum Scannen und Auslesen; ist ein GitHub-Repo mit Python/CLI-Skripten — lässt sich als Prozess starten; Ausgaben sind meist Dateien/Logs oder STDOUT.
+
+Beide sind **nicht primär REST-Server**, aber:
+
+* können via **subprocess** gestartet/gestoppt und ihr stdout/stderr geparsed werden;
+* viele gr-basierte Flows sind in Python verwendbar (du kannst Flowgraphs laden/steuern);
+* Ausgaben können in Dateien (pcap, JSON, CSV) oder Streams (ZMQ/UDP/TCP) generiert werden — ideal zum Einsammeln.
+
+---
+
+# 3) Integrationsmuster — auf Noctis-Seite (konkrete Optionen)
+
+### Option A — **Process-Adapter (einfach, robust)** ← empfehlenswert als MVP
+
+* Noctis startet `grgsm_scanner` / `gsmevil2`-Scripts als **subprocess** (via Python `subprocess.Popen`).
+* STDOUT/STDERR streamen → Noctis-Adapter parst Zeilen in Events (z. B. „IMSI seen“, „Cell ID“, `ts`, `rssi`).
+* Wenn Tools schreiben: beobachte Output-Verzeichnisse (inotify) und parse Dateien (pcap → Scapy/libosmocore, JSON, CSV).
+* Vorteile: simpel, wenig Änderung in Tools, leicht zu isolieren (Docker).
+* Nachteile: parsing fragile bei Formatwechsel; keine feingranulare Steuerung intern.
+
+### Option B — **Native Python / GNU Radio API** (sauber, mächtig)
+
+* Wenn du Flowgraphs (.grc) hast, starte/ingere Flowgraph direkt via Python (importiere bzw. instanziiere Blocks).
+* Kontrollier Paramter (Freq, Gain, FFT-Size) über API/Variablen.
+* Vorteil: feine Kontrolle, niedrige Latenz, strukturierter Zugriff auf Decodes.
+* Nachteil: mehr Entwicklungsaufwand / Abhängigkeit zu GNURadio-Versionen.
+
+### Option C — **Socket/Stream-Based** (wenn Tool unterstützt)
+
+* Einige Tools (oder eigen gebaute flowgraphs) können I/Q oder FFT/JSON per **ZMQ/UDP/TCP** streamen.
+* Noctis könnte ein Worker/Listener haben, der Streams direkt (binär oder JSON) entgegennimmt und weiterverarbeitet.
+* Vorteil: Echtzeit, robuste Trennung.
+* Voraussetzung: Tool muss streamen (oder du baust kleines wrapper-flowgraph).
+
+### Option D — **Filesystem + Batch** (Analyse-Pipeline)
+
+* Tools schreiben PCAP/PDUs; Noctis übernimmt Batch-Parsing (z. B. alle 30s) in eigene DB/Index.
+* Praktisch bei offline-Analyse, weniger Echtzeit-Anspruch.
+
+---
+
+# 4) Welche Daten sinnvoll in Noctis einspeisen (DTO-Vorschlag)
+
+Jede Zeile/Entity, die Noctis sehen sollte:
+
+* `event_type` = `imsi_seen` | `cell_detected` | `gsm_message` | `burst` | `decoded_pdu`
+* `ts` (UTC ISO), `source` (gr-gsm / gsmevil2 / flowgraph_name), `session_id`
+* `imsi?`, `tmsi?`, `msisdn?` (wenn vorhanden) — **privat**: Maskieren/Redact/Hash optional
+* `mcc_mnc?`, `lac?`, `cid?` (Cell information)
+* `rssi_db` (Signal level), `freq_hz`, `arfcn`
+* `raw_pdu` / `decoded_payload` (wenn nötig — vorsichtig behandeln)
+* `meta` = `{ tool_stdout_line, file_path, parser_version }`
+
+Damit kannst du: Watchlist-Matches (IMSI/TMSI), Stats (unique IMSIs), Maps (cells), Alerts.
+
+---
+
+# 5) Praktische Architektur-Skizze (Noctis <> Tool)
+
+1. **Orchestrator/Adapter** (per Tool): Start/Stop/Status via subprocess or Python API; exposes local control endpoint `/internal/tool/<name>/start` etc.
+2. **Worker**: Liest STDOUT, Files oder Streams, parst Events → normalisiert DTOs → sendet an Noctis Ingest API (`POST /api/ingest/gsm_event`) oder writes to Kafka/queue.
+3. **Ingest API / Queue**: Entgegennahme, Validation, dedupe, store in DB + push to Stats/Alerts.
+4. **UI**: Session Control, Live Event Stream (SSE/WebSocket), Exports, Audit.
+5. **Isolation**: Tools in Docker or dedicated users, Volumes für outputs; ensures easy restart & containment.
+
+---
+
+# 6) Steuerbarkeit: was du realistisch erwarten kannst
+
+* **Start/Stop/Restart**: Sehr einfach (subprocess / systemd / Docker).
+* **Parameter ändern zur Laufzeit** (freq, gain, sniff mode): Möglich, je nach Tool:
+
+  * gr-gsm Flowgraph via Python → direkt.
+  * gsmevil2 scripts → evtl durch restarting with new args, oder wenn script unterstützt, via IPC.
+* **Echtzeit Data Pull**: Möglich, wenn Tool streamt; sonst durch frequent file parsing.
+* **Health/Heartbeat**: Adapter sollte heartbeats liefern (ping auf process / monitor log lines).
+
+---
+
+# 7) Robustheit & Tests (Empfehlungen)
+
+* Verwende **Docker** für jede Tool-Instanz (reproducible env, dependency isolation).
+* **Supervision**: systemd / supervisor / docker-restart + healthcheck endpoint (adapter provides `GET /internal/tool/<name>/status`).
+* **Parser-Tests**: Unit tests für STDOUT/file parsing (tools ändern Formate).
+* **Rate Limiting / Sampling**: Falls massive data, downsample vor Ingest (configurable).
+
+---
+
+# 8) Datenschutz & Redaction (operational)
+
+* Default: **hash** oder maskiere IMSI/TMSI beim Speichern, zeige Vollwerte nur per opt-in (admin).
+* Exports: explizite Opt-In und Audit-Log.
+* Retention: automatische Löschung sensibler Daten nach Policy.
+
+---
+
+# 9) Quick-Start Integrations-Plan (konkret, 5 Schritte)
+
+1. **Choose mode**: MVP = **Process-Adapter** (Option A) + batch file parsing.
+2. **Create adapter** `adapter_grgsm.py` / `adapter_gsmevil2.py`:
+
+   * start(cmd args), stop(pid), status(), tail_stdout_parse()
+3. **Define DTO & Ingest API** (`/api/ingest/gsm_event`) and DB table.
+4. **Run laboratory test**: one container with RTL-SDR + test SIMs / Faraday cage; verify IMSI events show in UI.
+5. **Harden**: Dockerize, add healthchecks, add redaction & audit.
+
+---
+
+# 10) Fazit kurz
+
+* **Ja**, du kannst gr-gsm Scanner und gsmevil2 *weitestgehend steuern* und ihre Daten in Noctis bringen.
+* Der pragmatischste Einstieg ist ein **Process-Adapter** (start/stop + stdout/file parsing) und später auf **flowgraph/Python API** umsteigen, wenn du mehr Kontrolle/Effizienz brauchst.
+* **Wichtig:** Legalität & Privacy vorher klären; Noctis sollte Redaction/Audit + containment (Docker/Faraday) haben.
+
+---
+
+Wenn du magst, schreibe ich dir jetzt **konkrete Start/Stop-Parameter** und **Parsing-Regeln** für die üblichen gr-gsm/gsmevil2 CLI-Ausgaben (z. B. Beispiel-stdout-Zeile → wie daraus `imsi/rssi/cell` extrahieren). Oder ich erstelle die **Adapter-Blueprint** (Endpunkte, expected args, events), ebenfalls rein spec-mäßig, ohne Code. Was möchtest du als Nächstes?

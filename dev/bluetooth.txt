@@ -1,0 +1,78 @@
+Kurz und knackig:
+
+# 1) Exporte: zentral vs. im BT-Modul
+
+**Empfehlung:**
+Behalte das **zentrale “Exports”-Menü** als **einzige** schwere Export-Funktion (Quelle über Filter: `source=bt|wifi|rf`, Zeitrahmen, `min_rssi`, `hash_mac`, etc.).
+Im **Bluetooth-Modul** nur **kontextuelle Quick-Actions**:
+
+* „**Export dieser Session**“ → Deep-Link ins Exports-Menü mit **vorgefüllten Parametern** (`session_id=<...>&source=bt`).
+* „**Export letzte 24h (BT)**“ → ebenso Deep-Link mit Preset.
+
+**Warum so?**
+
+* ✅ Keine Logik-Duplikate (ein Exportpfad, Audit nur an einer Stelle).
+* ✅ Gleiches CSV/JSON-Schema für alle Quellen.
+* ✅ Besseres Rights/Audit-Handling (Exports haben oft strengere Policies).
+* ✅ UI bleibt konsistent (User weiß: große Exporte → Exports-Menü).
+
+**Optional (Komfort, aber nicht Pflicht):**
+Im BT-Modul eine **Mini-Export**-Schaltfläche „CSV klein (≤10k Zeilen)“ für schnelle, synchrone Mitschnitte—intern ruft sie trotzdem **den zentralen Export** auf (gleiche Engine, nur mit hartem Limit).
+
+---
+
+# 2) Start/Stop pro Scan-Modul
+
+**Ja, absolut sinnvoll.** Konsistentes Bedienmuster:
+
+* **Start**: Profil (Classic/BLE/Mixed), Adapter-Auswahl, **Dauer** (Presets: 5/15/30/60 min) **oder** „**läuft bis Stop**“.
+* **Stop**: immer sichtbar; **idempotent**.
+* **Sicherheitslogik** sichtbar: Cooldown-Timer, max gleichzeitige Sessions, Restlaufzeit.
+* **Status**: State-Pill („running/stopping/completed“), Heartbeat, Seen-Counter (1 min/5 min).
+
+UX-Tipp: Eine **persistente Control-Bar** oben pro Modul (BT/WiFi/RF) vermeidet Scrollen und zeigt stets den Session-Status.
+
+---
+
+# 3) Adapter-Info **ohne** TX-Power
+
+Passt. Schlank halten, dafür nützliche Diagnostik:
+
+* `id`, `name`, `mac`
+* `capabilities { classic, ble, gps? }`
+* `health: "ok|warn|error"` (z. B. Busy, Permission, Down)
+* `last_seen_at`
+* *(optional hilfreich)* `driver`/`stack` (z. B. BlueZ-Version), `permissions_ok: bool`
+
+Das deckt 99 % der Bedienfälle ab, ohne Hardware-Spezifika auszuwalzen.
+
+---
+
+# 4) Konsequenzen für Datenmodell & API (nur Struktur, kein Code)
+
+* **Kein** separater `bluetooth/export`-Endpunkt nötig; stattdessen zentraler `exports_api` (Quelle filterbar).
+* BT liefert nur **Session-Kontext** (IDs/Filter), **Exports** verarbeitet Quelle/Filter/Audit.
+* **DTO-Anpassung Adapter**: `tx_power` entfällt; Rest bleibt (s. oben).
+* **UI**:
+
+  * BT-Seite: Start/Stop + Status + zwei Export-Shortcuts (Deep-Links).
+  * Exports-Seite: Einheitliche Filter; „gekommen von: session_id=…“ als Badge.
+
+---
+
+# 5) Kleiner Qualitätsrahmen (damit es rund läuft)
+
+* **Audit nur einmal** (im Exports-Modul), inkl. Quelle, Filter, Nutzer, Timestamp.
+* **Schema-Gleichheit** (CSV/JSON) für alle Quellen—macht BI/Jupyter später viel einfacher.
+* **Limits & Feedback**: Bei großen Ranges klare Hinweise (Zeilenlimit, „bitte enger filtern“).
+* **Cooldown/Max-Dauer** sichtbar im BT-UI, damit Start/Stop erwartbar ist.
+
+---
+
+## TL;DR
+
+* **Exports zentralisieren**: Ja. BT nur **Deep-Links/Shortcuts** zur Exports-Seite.
+* **Start/Stop in jedem Scan-Modul**: Ja (mit Dauer-Presets + „bis Stop“).
+* **Adapter-Info ohne TX-Power**: Ja, mit Health/Capabilities genügt.
+
+Wenn du willst, mache ich dir als Nächstes eine **klare Feldliste** für die Exports-Filter (z. B. `source, session_id, from, to, min_rssi, watchlist_only, hash_mac`) und die **BT-Control-Bar** (alle sichtbaren Elemente/Status-Badges) – weiterhin nur Beratung, ohne Code.

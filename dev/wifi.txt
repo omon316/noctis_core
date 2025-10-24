@@ -1,0 +1,177 @@
+Alles klar — **nächstes Modul: WiFi-Scan**.
+(Scan-Module bisher: Bluetooth ✅, RF ✅; jetzt **WiFi**. DF/Devices/Alerts/Watch machen wir danach.)
+
+Ich bleibe bei reiner **Fähigkeits-/Spezifikations-Beratung** (ohne Code), kompatibel zu deiner Architektur (zentralisierte Exporte, Sessions, DTOs).
+
+---
+
+# Noctis WiFi — Fähigkeiten-Blueprint
+
+## A) Ziele (Was soll es können?)
+
+* **WLAN-Scanning** (2.4/5/6 GHz) mit **Sessions** (Start/Stop, timed/until-stop)
+* **Datenquellen flexibel** (Kismet, airodump-ng, `iw`/`iwlist`, `tshark`, optional Bettercap)
+* **Datenprodukte**: AP/Client-Discovery, Beacon/Probe/Assoc-Events, Channel-Occupancy (optional), RSSI-Timelines
+* **Live-Status/Telemetry** (heartbeat, seen-last-x-min, errors)
+* **Privacy**: MAC-Redaction optional, Randomized-MAC-Flagging
+* **Exports** über das **zentrale Exports-Modul**
+
+---
+
+## B) Empfohlene Integrationen (steuerbar + maschinenlesbar)
+
+1. **Kismet** (bevorzugt)
+
+* **API**: REST + WebSocket/Event-Streams
+* **Steuerung aus Noctis**: Start/Stop Capture-Source (oder Kismet-Daemon persistent, Session nur „logische“ Sammlung)
+* **Daten**: strukturierte JSON-Objekte (APs, Clients, SSIDs, Packets, Alerts)
+* **Vorteil**: Stabil, reichhaltige Metadaten, sehr gut scriptbar
+
+2. **airodump-ng**
+
+* **Steuerung**: subprocess (Start/Stop), Kanal/Interface-Args
+* **Daten**: CSV-Dateien für AP/Client-Liste (regelmäßiges Update)
+* **Vorteil**: simpel, überall verfügbar; **Nachteil**: Parsing, kein echter Stream
+
+3. **tshark** (passiv)
+
+* **Steuerung**: subprocess, Display-Filter (Mgmt/Probe/Assoc), JSON-Output
+* **Daten**: Paket-Events als JSON → Ingest → abgeleitete AP/Client-Tabellen
+* **Vorteil**: flexibel; **Nachteil**: CPU-intensiver, komplexere Filter
+
+4. *(Optional)* **Bettercap**
+
+* **API**: REST/Event-Stream
+* **Nutzen**: sehr guter Live-Event-Feed; Vorsicht: aktive Features deaktivieren (Labor!)
+
+→ Du kannst mit **Kismet** starten (MVP), und später **Airodump/tshark** als Fallback-Adapter ergänzen. Alles über einen **Adapter-Layer** (siehe unten).
+
+---
+
+## C) Sessions & Profile
+
+* **Session**: `session_id`, `state (created|running|stopping|completed|failed)`, `profile`, `interfaces[]`, `bands (2.4|5|6)`, `channels?`, `channel_hop?:bool`, `duration_sec?`, `notes?`, `last_heartbeat`, `telemetry{}`
+* **Profile-Vorschläge**:
+
+  * `WIFI_SURVEY_BASIC`: Hop über Standardkanäle (2.4 GHz), dwell 250–500 ms
+  * `WIFI_SURVEY_EXTENDED`: 2.4+5 GHz-Hop, dwell 250–500 ms
+  * `WIFI_FIXED_CH`: feste Kanäle (z. B. 1/6/11) für hohe Zeitauflösung
+  * `WIFI_6E_SCAN`: 6 GHz-Kanäle (wenn hw/land erlaubt)
+* **Limits**: max 1–2 gleichzeitige WiFi-Sessions, Cooldown zwischen Starts, Max-Dauer (z. B. 3600 s)
+
+---
+
+## D) Datenprodukte (DTOs)
+
+1. **AccessPoint (AP)**
+
+* `ap_id` (stable hash), `bssid`, `ssid?`, `first_seen_at`, `last_seen_at`, `channel`, `band`, `security` (WPA/WPA2/WPA3/Open), `oui_vendor?`, `rssi_stats{last,avg,p95}`, `beacon_interval?`, `rates?`, `tags[]`
+
+2. **Client Device**
+
+* `client_id` (hash), `mac`, `associated_bssid?`, `first_seen_at`, `last_seen_at`, `probe_ssids[]?`, `oui_vendor?`, `rssi_stats{}`, `flags{randomized_mac}`
+
+3. **WiFi Events**
+
+* `event_type` (`beacon`, `probe_req`, `probe_resp`, `assoc`, `disassoc`, `deauth`, `data_frame`), `ts`, `band/ch`, `rssi`, `src_mac`, `dst_mac?`, `bssid?`, `ssid?`, `meta{}`
+
+4. **Channel Occupancy** (optional MVP)
+
+* `ts_bucket`, `channel`, `band`, `occupancy_percent`, `avg_power_dbm?` (aus RF-Modul oder aus RSSI-Histogramm abgeleitet)
+
+5. **Telemetry**
+
+* `seen_aps_total`, `seen_clients_total`, `events_count`, `errors`, `duration_sec`, `last_heartbeat`, `seen_last_1m/5m`
+
+---
+
+## E) API (Spec-Level, analog zu RF/BT)
+
+* `POST /api/wifi/sessions` – Start (Profile, interfaces, bands, channels, hop, duration)
+* `POST /api/wifi/sessions/{id}/stop` – idempotent Stop
+* `GET /api/wifi/sessions` – List (paging, filters)
+* `GET /api/wifi/sessions/{id}` – Status + Telemetry
+* `GET /api/wifi/adapters` – verfügbare WLAN-Interfaces + capabilities (2.4/5/6, monitor-mode ok?)
+* `GET /api/wifi/aps` – Query APs (filter: time range, band, channel, ssid, vendor)
+* `GET /api/wifi/clients` – Query Clients (filter: assoc state, vendor, randomized flag)
+* `GET /api/wifi/events` – Events (filter: type, mac/bssid, time range)
+* `POST /api/wifi/sessions/{id}/snapshot` – optional: momentane AP/Client-Liste „freezen“
+* `POST /api/wifi/export` – **delegiert** an zentrales Exports-Modul (params: `source=wifi, session_id?, from,to, format`)
+
+---
+
+## F) Adapter-Layer (erweiterbar, pro Tool)
+
+Einheitliches Interface je Tool:
+
+* `start(session_params)` → startet Tool (subprocess/API)
+* `stop(session_id)` → stoppt sicher
+* `status(session_id)` → liefert State + Heartbeat/Fehler
+* `stream()` → liefert Events/Records (AP/Client/Event)
+* `snapshot()` → optional (AP/Client-Liste)
+
+**Adapter konkret:**
+
+* **KismetAdapter**: REST-Steuerung (oder nur „attach“) + WS-Events → parse in DTOs
+* **AirodumpAdapter**: subprocess + CSV-Parser (AP/Station CSV) → periodic ingest
+* **TsharkAdapter**: subprocess + `-T json` → line-by-line JSON parsing (Mgmt frames)
+* **BettercapAdapter (optional)**: REST start + Event-Stream → DTO
+
+---
+
+## G) UI / UX
+
+* **Control-Bar** (oben fix): Start (Profile, Interfaces, Bands, Hop, Dauer), Stop, Status-Pill, Heartbeat, Seen last 1m/5m, Errors
+* **AP/Client-Tabellen**: sortable, filterbar (Band/Channel/SSID/Vendor, Randomized MAC)
+* **Event-Console**: Live-Feed (SSE/WebSocket) mit Typ-Filter
+* **Quick-Export**-Shortcuts: Deep-Link ins Exports-Menü (vorbefüllt mit `source=wifi&session_id=...`)
+* **Details**: AP-Detailseite (RSSI-Timeline, zuletzt gesehene Clients), Client-Detail (Probe-SSIDs, Bewegungsprofil falls Geo vorhanden)
+
+---
+
+## H) Privacy/Security
+
+* **Redaction**: MACs standardmäßig maskieren/hashen in Exports; Vollansicht nur für Admin
+* **Randomized MAC** flaggen (OUI/Local bit); Kennzeichnung in UI
+* **Audit**: Start/Stop/Export protokollieren
+* **Lab-Flag**: Option „Laborbetrieb“ sichtbar (deaktiviert aktive/Intrusive Funktionen verbindlich)
+
+---
+
+## I) Telemetry & Health
+
+* **Metriken**: `wifi_sessions_started/completed/failed_total`, `wifi_events_total`, `wifi_aps_seen_total`, `wifi_clients_seen_total`
+* **Health**: Adapter monitor mode ok, channel set ok, tool reachable; errors mit Codes (permission, busy, parse_error)
+* **Heartbeat**: alle 5–10 s je Session
+
+---
+
+## J) Exports (zentral)
+
+* **APs/Clients** CSV/JSON (Filter: Zeit, Band, Channel, SSID, Vendor, Randomized)
+* **Events** JSON (Filter: Typ, BSSID/MAC, Zeit)
+* **Channel-Occupancy** CSV (optional, wenn befüttert)
+* **Audit** Pflicht
+
+---
+
+## K) Tests / Abnahme
+
+* Session-Lifecycle: Start → Running (Heartbeat) → Stop → Completed; Telemetry konsistent
+* Kismet-Stream: mind. AP/Client-Objekte kommen an; Felder korrekt gemappt
+* Airodump-CSV: Parser robust (Headervarianten, leere Felder), regelmäßiges Update
+* Tshark-JSON: Mgmt-Frames korrekt gefiltert & klassifiziert (`beacon`, `probe`, `assoc`)
+* Privacy: Randomized MAC korrekt erkannt; Exports redacted by default
+* Performance: 2.4+5 GHz-Hop mit dwell 250–500 ms → UI bleibt responsiv
+
+---
+
+### Warum WiFi separat (und nicht nur RF)?
+
+* Andere **Domäne** (AP/Client-Modelle, SSID, Assoc-States)
+* **Erweiterte Analytics** (Probe-SSIDs, Vendor-Verteilung, Random-MACs)
+* Bessere **UI** (AP/Client-Ansichten), unabhängig von RF-Waterfall/Occupancy
+
+---
+
+Wenn das so passt, gehen wir als Nächstes ins **DF-Modul** (Direction Finding) **oder** ins **Alerts/Watchlist**-Backend (viele deiner Wünsche hängen daran). Du sagst, welches dir wichtiger ist.

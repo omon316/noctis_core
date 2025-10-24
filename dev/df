@@ -1,0 +1,229 @@
+top — dann definieren wir NoctisDF so, dass es den **Kraken-DF-Dienst (Dashboard)** entweder selbst startet („managed“) oder sich an eine bereits laufende Instanz anhängt („attached“) – und dabei **Live-** und **History-Daten** zuverlässig in Noctis einspeist und weiterverarbeitet. (Nur Beratung/Spez – kein Code.)
+
+# Zielbild
+
+* In NoctisDF gibt es einen **Start/Stop**-Button für *Kraken Dashboard* (managed mode).
+* Alternativ **Attach** an externen Kraken (attached mode).
+* **Live-DoA** (Bearing/Confidence) + **Kalibrier-/GNSS-/Spectrum-Status** werden in Echtzeit eingelesen.
+* **History**: Backfill der vergangenen Messungen (seit Session-Beginn oder aus Kraken-Logs/API).
+* Alles landet in **einheitlichen DTOs**, wird **persistiert**, kann **geplottet**, **trianguliert** und **exportiert** werden.
+
+---
+
+# Betriebsarten (Adapter-Modell)
+
+## 1) Managed Mode (Noctis startet Kraken)
+
+* **Startquelle**: `systemd` **oder** `docker` (Compose/Container).
+* **NoctisDF Control-Bar**:
+
+  * `Start Kraken` → startet Dienst (hinterlegt: Service/Compose-Name).
+  * `Stop Kraken` → sauber stoppen.
+  * `Open Kraken UI` → Link in neuem Tab (z. B. `http://<host>:<port>/`).
+* **Healthcheck**: HTTP-GET auf Dashboard/API-URL, + UDP-Probe für Bearing-Stream.
+
+## 2) Attached Mode (Noctis hängt sich an laufenden Kraken)
+
+* **Konfig**: `kraken.host`, `dashboard_port`, `api_base_url?`, `udp_bearing_port?`, `ws_url?`, `auth_token?`.
+* **Attach**: NoctisDF verbindet Reader (UDP/WS/REST).
+* **UI**: Badge „Attached to Kraken @host:port“ + „Open Kraken UI“.
+
+> Empfehlung: Beide Modi unterstützen, via **Profil/Adapter-Auswahl**. Managed = bequem im Labor, Attached = flexibel (z. B. mobiles Setup).
+
+---
+
+# Datenwege (Ingest)
+
+## Live
+
+* **UDP JSON Bearing** (typisch): Noctis lauscht auf konfiguriertem Port.
+
+  * Vorteile: sehr geringe Latenz, simple JSON-Struktur.
+* **WebSocket** (falls angeboten): Spektrum-/Level-Frames, Bearing-Events.
+* **REST Polling**: Status, Kalibrierung, GNSS/Heading, Geräteparameter (z. B. alle 1–5 s).
+
+## History
+
+* **Variante A – API**: Falls Kraken eine History-API bereitstellt → Seitenweise abholen (`from`, `to`, `cursor`).
+* **Variante B – File Import**: CSV/JSON-Logs aus Kraken-Output-Verzeichnis einlesen (konfigurierter Pfad/Volume).
+* **Variante C – Noctis-eigene History**: Noctis zeichnet Live-Feed selbst fortlaufend auf → History ist immer vollständig.
+
+> Empfehlung: **C als Standard** (Noctis persistiert alles live) + **B als Backfill** (Import bereits existierender Logfiles). API-History nutzen, wenn stabil verfügbar.
+
+---
+
+# DTOs (einheitlich für Noctis)
+
+## BearingDTO
+
+```
+station_id: string
+ts: ISO-UTC
+freq_hz: number
+bearing_deg: number (0..360)
+confidence: number (0..1)
+lat?: number
+lon?: number
+heading_deg?: number
+calibrated: boolean
+meta?: { snr?: number, peak_power_dbm?: number, noise_floor_dbm?: number, source: "kraken" }
+session_id: string
+```
+
+## CalibrationDTO
+
+```
+station_id: string
+ts: ISO-UTC
+state: "not_calibrated"|"in_progress"|"calibrated"
+phase_offsets?: number[]
+amp_balance?: number[]
+array_geometry?: { spacing_mm: number, layout: "circular"|"linear"|"custom" }
+session_id: string
+```
+
+## SpectrumDTO (downsampled)
+
+```
+station_id: string
+ts: ISO-UTC
+freq_start_hz: number
+freq_end_hz: number
+power_bins: number[]   // komprimiert/normalisiert
+session_id: string
+```
+
+## StationDTO
+
+```
+station_id: string
+name: string
+lat?: number
+lon?: number
+gnss_fix?: "none"|"2d"|"3d"
+heading_deg?: number
+health: "ok"|"warn"|"error"
+meta?: { uptime_s?: number, sample_rate?: number, gains?: any }
+```
+
+---
+
+# API (Noctis, spec-level)
+
+## Control / Sessions
+
+* `POST /api/df/kraken/session` → **Start/Attach** Kraken-Session
+  Body: `{ mode: "managed"|"attached", host?, dashboard_port?, api_base_url?, udp_bearing_port?, ws_url?, notes? }`
+  Returns: `{ session_id, state:"running", station_id, dashboard_url }`
+* `POST /api/df/kraken/session/{id}/stop` → **Stop/Detach** (idempotent)
+* `GET /api/df/kraken/session/{id}` → Status/Telemetry (heartbeat, last_bearing_ts, calibration_state)
+* `GET /api/df/stations` → registrierte DF-Stationen (inkl. Kraken-Station)
+
+## Ingest / Data
+
+* `GET /api/df/bearings` → Query bearings (filter: `station_id`, time range, `min_confidence`, `freq_range`, paging)
+* `GET /api/df/calibration` → letzter Kalibrierstatus / Verlauf
+* `GET /api/df/spectrum` → downsampled frames (cursor/paging)
+* `POST /api/df/import/kraken_logs` → Backfill von CSV/JSON-Logs (zentraler Import)
+
+## Exports (delegiert)
+
+* `POST /api/exports` mit Parametern `source=df`, `type=bearings|spectrum|calibration`, `station_id?`, `session_id?`, `from`, `to`, `format=csv|json`, `compress?`
+
+---
+
+# UI / UX (NoctisDF)
+
+* **Control-Bar**:
+
+  * Mode: Managed/Attached
+  * Start / Stop
+  * Open Kraken UI (Button → neues Tab/Window)
+  * Status-Pills: `Running`, `Attached`, `Calibrated / Not Calibrated`, `GNSS Fix`, `Heartbeat`
+* **Live-Panel**:
+
+  * Bearing-Fächer auf Karte (aktuelle DoA mit Konfidenz-Breite)
+  * Timeline (rolling): Bearing vs. Zeit, Confidence vs. Zeit
+  * Calibration-Status-Widget (mit Hinweisen)
+* **History-Panel**:
+
+  * Zeitfenster wählen → Bearings-Scatter / Heatmap von Azimuten
+  * Export-Shortcut (deep-link zum Exports-Menü)
+* **Triangulation (optional)**:
+
+  * Mehrere Stationen auswählen → Heatmap/Intersections
+  * Glättung (EMA/Kalman), Outlier-Reject (z. B. unter min_conf)
+
+---
+
+# Konfiguration (Noctis)
+
+```
+df.kraken.mode: "managed"|"attached"
+df.kraken.host: "127.0.0.1"
+df.kraken.dashboard_port: 8080
+df.kraken.api_base_url: "http://127.0.0.1:8080/api"
+df.kraken.udp_bearing_port: 29600
+df.kraken.ws_url: "ws://127.0.0.1:8080/ws"
+df.kraken.auth_token?: "..."
+df.kraken.manage:
+  systemd_service?: "kraken.service"
+  docker_compose_path?: "/opt/kraken/docker-compose.yml"
+  container_name?: "kraken"
+ingest.buffers.df_bearing.max: 10000
+ingest.retry.backoff_ms: 250..5000
+```
+
+---
+
+# Verarbeitung & Qualität
+
+* **Smoothing**: EMA/Kalman für Bearing-Linie (optionaler UI-Toggle).
+* **Outlier-Reject**: Discard wenn `confidence < min_conf` oder Sprünge > X°/s.
+* **Heading-Kompensation**: Bearings relativ zu Fahrzeug-Heading korrigieren (falls mobile Station).
+* **Triangulation**: Schnittpunkte/Heatmap mit gewichteten Fächern (Gewicht = Confidence).
+* **Kalibrierungs-Guard**: Wenn `calibrated=false` → UI warnt, Alerts drosseln/markieren.
+
+---
+
+# Health & Fehlerfälle
+
+* **Dashboard down**: Health „error“; Retry + Nutzerhinweis (Host/Port prüfen).
+* **UDP fehlt**: Warn-Badge „No bearing stream“; prüfe Firewall/Port.
+* **Desync**: `last_bearing_ts` älter als N Sekunden → Heartbeat warn.
+* **Backfill-Fehler**: Log & teilweises Import-Rollback, Skipped-Count ausgeben.
+
+---
+
+# Security / Audit
+
+* **Auth**: Bearer + Scopes `df:control`, `df:view`, `df:export`
+* **Audit**: Start/Stop/Attach/Import/Export mit User, Timestamp, Params
+* **CORS/CSRF**: nur interne Nutzung (Labor), trotzdem Standards setzen
+* **Rate Limit**: Ingest-Queue drosseln bei Lastspitzen
+
+---
+
+# Akzeptanzkriterien (kurz)
+
+* `Start Kraken (managed)` → Service läuft, Dashboard erreichbar, Live-Bearings in ≤ 3 s sichtbar.
+* `Attach Kraken (attached)` → ohne Neustart live verbunden.
+* `Stop` → idempotent, Status „completed“/„detached“.
+* Live-Daten persistiert; History-Query liefert korrekte Anzahl und Zeitraum.
+* Backfill aus CSV/JSON importiert; Duplikate de-dupliziert (by `station_id + ts`).
+* „Open Kraken UI“ öffnet verifizierbare URL.
+* Telemetrie (last_bearing_ts, calibrated) aktualisiert sich ≤ 5 s.
+
+---
+
+# Mini-Roadmap (nur für dieses Modul)
+
+1. **Adapter & Config** (Managed + Attached), Healthchecks, „Open UI“
+2. **UDP/WS/REST Ingest** Pfade + Persistenz (Bearings/Calibration)
+3. **History-Backfill** (Dateiimport) + De-dup
+4. **UI Live/History** + Exports-Shortcuts
+5. **Triangulation (multi-station) & Smoothing** (optional Phase 2)
+
+---
+
+Wenn du magst, schreibe ich dir daraus ein **Issue-Paket** („Noctis DF – Kraken Integration“) mit 5–7 Tickets (je Featureblock + Akzeptanzkriterien), damit du es 1:1 an Claude verteilen kannst.
