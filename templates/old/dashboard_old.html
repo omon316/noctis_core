@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoctisCore Dashboard</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/noctis.css') }}">
+</head>
+<body>
+    <!-- TOP BAR -->
+    <div class="topbar">
+        <div class="topbar-left">
+            <div class="logo">NOCTIS<span style="color: var(--accent-cyan);">CORE</span></div>
+            <div class="status-badge">
+                <div class="status-led"></div>
+                <span>OPERATIONAL</span>
+            </div>
+        </div>
+
+        <!-- MODULE NAVIGATION -->
+        <div class="topbar-modules">
+            <button class="module-btn active" data-module="setup" title="Scanner Setup">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"></path>
+                </svg>
+                <span>SETUP</span>
+            </button>
+            <button class="module-btn" data-module="stats" title="Statistiken">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="20" x2="12" y2="10"></line>
+                    <line x1="18" y1="20" x2="18" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="16"></line>
+                </svg>
+                <span>STATS</span>
+            </button>
+            <button class="module-btn" data-module="logs" title="Logs">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                <span>LOGS</span>
+            </button>
+            <button class="module-btn" data-module="map" title="GPS Karte">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+                    <line x1="8" y1="2" x2="8" y2="18"></line>
+                    <line x1="16" y1="6" x2="16" y2="22"></line>
+                </svg>
+                <span>MAP</span>
+            </button>
+            <button class="module-btn" data-module="watchlist" title="Watchlist">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <span>WATCH</span>
+            </button>
+            <button class="module-btn" data-module="export" title="Export">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>EXPORT</span>
+            </button>
+            <button class="module-btn" data-module="compare" title="Vergleich">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+                <span>COMPARE</span>
+            </button>
+            <button class="module-btn" data-module="trends" title="Trends">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                    <polyline points="17 6 23 6 23 12"></polyline>
+                </svg>
+                <span>TRENDS</span>
+            </button>
+            <button class="module-btn" data-module="ai" title="KI Vorhersage">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+                <span>AI</span>
+            </button>
+        </div>
+
+        <div class="topbar-right">
+            <button class="icon-btn" id="alerts-btn" title="Alerts">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                <span class="notification-badge">3</span>
+            </button>
+            <button class="icon-btn" id="settings-btn" title="Settings">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- SIDEBAR (Dynamic Content) -->
+        <div class="sidebar" id="sidebar">
+            <!-- Content wird dynamisch per JS geladen -->
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div class="main-content">
+            <!-- MODULE: SETUP -->
+            <div class="module-view active" id="module-setup">
+                <div class="content-header">
+                    <div class="page-title">SCANNER SETUP</div>
+                    <div class="header-actions">
+                        <button class="btn-primary" id="btn-scan-start">
+                            <span>▶</span> START SCAN
+                        </button>
+                        <button class="btn-secondary" id="btn-scan-stop" disabled>
+                            <span>⏹</span> STOP SCAN
+                        </button>
+                    </div>
+                </div>
+                <div class="content-body">
+                    <!-- Scanner Status -->
+                    <div class="stats-grid">
+                        <div class="card">
+                            <div class="card-title">SCANNER STATUS</div>
+                            <div class="card-value" style="display: flex; align-items: center; gap: 10px;">
+                                <div class="status-led inactive" id="scanner-led"></div>
+                                <span id="scanner-status">IDLE</span>
+                            </div>
+                            <div class="card-description" id="scanner-description">Waiting for command</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">SCAN DURATION</div>
+                            <div class="card-value" id="scan-duration">00:00:00</div>
+                            <div class="card-description">RUNTIME</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">DEVICES FOUND</div>
+                            <div class="card-value" id="devices-found">0</div>
+                            <div class="card-description">THIS SESSION</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">LAST SCAN</div>
+                            <div class="card-value" id="last-scan-time">--:--</div>
+                            <div class="card-description">TIMESTAMP</div>
+                        </div>
+                    </div>
+
+                    <!-- Live Device List -->
+                    <div class="section-title">DETECTED DEVICES</div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>TIME</th>
+                                    <th>MAC ADDRESS</th>
+                                    <th>NAME</th>
+                                    <th>RSSI</th>
+                                    <th>TYPE</th>
+                                    <th>STATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="device-table-body">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: #666;">No devices detected yet. Start a scan to begin.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: STATISTICS -->
+            <div class="module-view" id="module-stats">
+                <div class="content-header">
+                    <div class="page-title">STATISTICS</div>
+                </div>
+                <div class="content-body">
+                    <div class="stats-grid">
+                        <div class="card">
+                            <div class="card-title">TOTAL DEVICES</div>
+                            <div class="card-value" id="stat-total">0</div>
+                            <div class="card-description">UNIQUE</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">ACTIVE TODAY</div>
+                            <div class="card-value" id="stat-today">0</div>
+                            <div class="card-description">LAST 24H</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">AVG SCANS/DEVICE</div>
+                            <div class="card-value" id="stat-avg">0.0</div>
+                            <div class="card-description">AVERAGE</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">WATCHLIST HITS</div>
+                            <div class="card-value" id="stat-watchlist">0</div>
+                            <div class="card-description">ALERTS</div>
+                        </div>
+                    </div>
+                    <div class="section-title">TOP DEVICES</div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>RANK</th>
+                                    <th>MAC ADDRESS</th>
+                                    <th>NAME</th>
+                                    <th>DETECTIONS</th>
+                                    <th>LAST SEEN</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-devices-body">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: #666;">No data available</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: LOGS -->
+            <div class="module-view" id="module-logs">
+                <div class="content-header">
+                    <div class="page-title">SYSTEM LOGS</div>
+                    <div class="header-actions">
+                        <button class="btn-secondary" id="btn-refresh-logs">
+                            <span>⟳</span> REFRESH
+                        </button>
+                        <button class="btn-secondary" id="btn-clear-logs">
+                            <span>×</span> CLEAR
+                        </button>
+                    </div>
+                </div>
+                <div class="content-body">
+                    <div class="log-viewer" id="log-viewer">
+                        <div style="color: #666; text-align: center; padding: 20px;">No logs available</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: MAP -->
+            <div class="module-view" id="module-map">
+                <div class="content-header">
+                    <div class="page-title">GPS MAP</div>
+                </div>
+                <div class="content-body">
+                    <div class="map-container" id="map-container">
+                        <div style="color: #666; text-align: center; padding: 40px;">
+                            <p>Map view coming soon</p>
+                            <p style="font-size: 12px; margin-top: 10px;">GPS data visualization will be displayed here</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: WATCHLIST -->
+            <div class="module-view" id="module-watchlist">
+                <div class="content-header">
+                    <div class="page-title">WATCHLIST</div>
+                    <div class="header-actions">
+                        <button class="btn-primary" id="btn-add-watchlist">
+                            <span>+</span> ADD DEVICE
+                        </button>
+                    </div>
+                </div>
+                <div class="content-body">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>MAC ADDRESS</th>
+                                    <th>DESCRIPTION</th>
+                                    <th>ADDED</th>
+                                    <th>LAST SEEN</th>
+                                    <th>ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="watchlist-body">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: #666;">No devices on watchlist</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: EXPORT -->
+            <div class="module-view" id="module-export">
+                <div class="content-header">
+                    <div class="page-title">DATA EXPORT</div>
+                </div>
+                <div class="content-body">
+                    <div class="stats-grid">
+                        <div class="card clickable" id="export-csv">
+                            <div class="card-title">CSV EXPORT</div>
+                            <div class="card-value">📄</div>
+                            <div class="card-description">Export as CSV</div>
+                        </div>
+                        <div class="card clickable" id="export-json">
+                            <div class="card-title">JSON EXPORT</div>
+                            <div class="card-value">📋</div>
+                            <div class="card-description">Export as JSON</div>
+                        </div>
+                        <div class="card clickable" id="export-backup">
+                            <div class="card-title">FULL BACKUP</div>
+                            <div class="card-value">💾</div>
+                            <div class="card-description">Complete backup</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">DB SIZE</div>
+                            <div class="card-value" id="db-size">0 KB</div>
+                            <div class="card-description">Database size</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: COMPARE -->
+            <div class="module-view" id="module-compare">
+                <div class="content-header">
+                    <div class="page-title">TIME COMPARISON</div>
+                </div>
+                <div class="content-body">
+                    <p style="color: #666;">Time period comparison coming soon...</p>
+                </div>
+            </div>
+
+            <!-- MODULE: TRENDS -->
+            <div class="module-view" id="module-trends">
+                <div class="content-header">
+                    <div class="page-title">LONG-TERM TRENDS</div>
+                </div>
+                <div class="content-body">
+                    <p style="color: #666;">Trend analysis coming soon...</p>
+                </div>
+            </div>
+
+            <!-- MODULE: AI -->
+            <div class="module-view" id="module-ai">
+                <div class="content-header">
+                    <div class="page-title">AI PREDICTIONS</div>
+                </div>
+                <div class="content-body">
+                    <p style="color: #666;">AI-powered predictions coming soon...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

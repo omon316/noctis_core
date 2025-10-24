@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoctisCore - Statistics</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/noctis.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <!-- TOP NAVIGATION -->
+    <nav class="top-nav">
+        <!-- Logo -->
+        <div class="logo">
+            <div class="logo-icon">
+                <div class="logo-circle"></div>
+                <div class="logo-circle"></div>
+            </div>
+            <span>NoctisCore</span>
+        </div>
+
+        <!-- Navigation Items -->
+        <div class="nav-items">
+            <a href="/" class="nav-item">HOME</a>
+            <a href="/stats" class="nav-item active">STATS</a>
+            <a href="/logs" class="nav-item">LOGS</a>
+            <a href="/map" class="nav-item">MAP</a>
+            <a href="/watch" class="nav-item">WATCH</a>
+            <a href="/export" class="nav-item">EXPORT</a>
+        </div>
+
+        <!-- Right Side -->
+        <div class="nav-right">
+            <!-- Search -->
+            <div class="search-container">
+                <input type="text" class="search-input" placeholder="Search...">
+                <span class="search-icon">◉</span>
+            </div>
+
+            <!-- Notifications -->
+            <div class="notification-container">
+                <div class="notification-bell">
+                    ▲
+                    <span class="notification-badge">0</span>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <button class="icon-btn">◆</button>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTAINER -->
+    <div class="main-container">
+        <!-- LEFT SIDEBAR -->
+        <aside class="sidebar">
+            <!-- Time Filter -->
+            <div class="sidebar-section">
+                <div class="sidebar-title">TIME RANGE</div>
+                <div class="sidebar-item active" data-filter="time" data-value="all">
+                    <div class="filter-checkbox checked">✓</div>
+                    <span>ALL TIME</span>
+                </div>
+                <div class="sidebar-item" data-filter="time" data-value="24h">
+                    <div class="filter-checkbox"></div>
+                    <span>LAST 24H</span>
+                </div>
+                <div class="sidebar-item" data-filter="time" data-value="7d">
+                    <div class="filter-checkbox"></div>
+                    <span>LAST 7 DAYS</span>
+                </div>
+                <div class="sidebar-item" data-filter="time" data-value="30d">
+                    <div class="filter-checkbox"></div>
+                    <span>LAST 30 DAYS</span>
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="sidebar-section">
+                <div class="sidebar-title">QUICK STATS</div>
+                <div class="system-info">
+                    <div class="info-row">
+                        <span>Total Scans:</span>
+                        <span class="text-cyan" id="sidebar-total">--</span>
+                    </div>
+                    <div class="info-row">
+                        <span>Unique Devices:</span>
+                        <span id="sidebar-unique">--</span>
+                    </div>
+                    <div class="info-row">
+                        <span>Last 24h:</span>
+                        <span id="sidebar-24h">--</span>
+                    </div>
+                    <div class="info-row">
+                        <span>Last Hour:</span>
+                        <span id="sidebar-1h">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export -->
+            <div class="sidebar-section">
+                <div class="sidebar-title">EXPORT</div>
+                <button class="sidebar-btn" id="export-csv-btn">
+                    <span>📄</span> EXPORT CSV
+                </button>
+                <button class="sidebar-btn" id="export-json-btn">
+                    <span>📋</span> EXPORT JSON
+                </button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="content">
+            <!-- Header -->
+            <div class="content-header">
+                <h1 class="page-title">STATISTICS & ANALYTICS</h1>
+                <div class="header-actions">
+                    <button class="btn-secondary" id="refresh-btn">
+                        <span>⟲</span> REFRESH
+                    </button>
+                </div>
+            </div>
+
+            <!-- Overview Cards -->
+            <div class="stats-overview">
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: var(--accent-cyan);">◉</div>
+                    <div class="stat-content">
+                        <div class="stat-label">TOTAL SCANS</div>
+                        <div class="stat-value" id="stat-total">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: var(--accent-green);">◈</div>
+                    <div class="stat-content">
+                        <div class="stat-label">UNIQUE DEVICES</div>
+                        <div class="stat-value" id="stat-unique">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: var(--accent-yellow);">◎</div>
+                    <div class="stat-content">
+                        <div class="stat-label">LAST 24H</div>
+                        <div class="stat-value" id="stat-24h">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: var(--accent-red);">◇</div>
+                    <div class="stat-content">
+                        <div class="stat-label">LAST HOUR</div>
+                        <div class="stat-value" id="stat-1h">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="charts-grid">
+                <!-- Hourly Activity -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">HOURLY ACTIVITY (24H)</h3>
+                        <div class="chart-info">Peak: <span id="peak-hour">--:--</span></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="hourly-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Daily Activity -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">DAILY ACTIVITY (30D)</h3>
+                        <div class="chart-info">Max: <span id="max-day">--</span></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="daily-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Weekday Pattern -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">WEEKDAY PATTERN</h3>
+                        <div class="chart-info">Most Active: <span id="most-active-day">--</span></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="weekday-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- RSSI Distribution -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">RSSI DISTRIBUTION</h3>
+                        <div class="chart-info">Median: <span id="rssi-median">--</span> dBm</div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="rssi-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- OUI/Vendor Stats -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">TOP VENDORS</h3>
+                        <div class="chart-info">Total: <span id="vendor-count">--</span></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="oui-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Protocol Mix -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">PROTOCOL MIX</h3>
+                        <div class="chart-info">Devices: <span id="protocol-total">--</span></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="protocol-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Heatmap -->
+            <div class="content-section">
+                <h2 class="section-title">ACTIVITY HEATMAP (HOUR × WEEKDAY)</h2>
+                <div class="heatmap-container">
+                    <canvas id="heatmap-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Devices Table -->
+            <div class="content-section">
+                <h2 class="section-title">TOP 10 DEVICES</h2>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>RANK</th>
+                                <th>MAC ADDRESS</th>
+                                <th>NAME</th>
+                                <th>VENDOR</th>
+                                <th>COUNT</th>
+                                <th>SHARE %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="top-devices-table">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted);">
+                                    Loading...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Device Lifetime Stats -->
+            <div class="content-section">
+                <h2 class="section-title">DEVICE LIFETIME ANALYSIS</h2>
+                <div class="lifetime-grid">
+                    <div class="lifetime-card">
+                        <div class="lifetime-label">AVG LIFETIME</div>
+                        <div class="lifetime-value" id="lifetime-avg">-- min</div>
+                    </div>
+                    <div class="lifetime-card">
+                        <div class="lifetime-label">MEDIAN LIFETIME</div>
+                        <div class="lifetime-value" id="lifetime-median">-- min</div>
+                    </div>
+                    <div class="lifetime-card">
+                        <div class="lifetime-label">MAX LIFETIME</div>
+                        <div class="lifetime-value" id="lifetime-max">-- min</div>
+                    </div>
+                    <div class="lifetime-card">
+                        <div class="lifetime-label">MULTI-SIGHTINGS</div>
+                        <div class="lifetime-value" id="lifetime-multi">--</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/stats.js') }}"></script>
+</body>
+</html>

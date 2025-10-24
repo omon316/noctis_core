@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoctisCore Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/noctis.css') }}">
+</head>
+<body>
+    <!-- TOP NAVIGATION -->
+    <div class="top-nav">
+        <div class="logo">
+            <div class="logo-icon">
+                <div class="logo-circle"></div>
+                <div class="logo-circle"></div>
+            </div>
+            <span>NoctisCore</span>
+        </div>
+        <div class="nav-items">
+            <div class="nav-item active" data-view="home">HOME</div>
+            <div class="nav-item" data-view="scan">SCAN</div>
+            <div class="nav-item" data-view="stats">STATS</div>
+            <div class="nav-item" data-view="logs">LOGS</div>
+            <div class="nav-item" data-view="map">MAP</div>
+            <div class="nav-item" data-view="settings">SETTINGS</div>
+        </div>
+        
+        <!-- LIVE SEARCH -->
+        <div class="search-container">
+            <input type="text" class="search-input" id="searchInput" 
+                   placeholder="[VOLLTEXT-SUCHE]">
+            <div class="search-dropdown" id="searchDropdown"></div>
+        </div>
+
+        <!-- NOTIFICATION BELL -->
+        <div class="notification-container">
+            <div class="notification-bell" id="notificationBell">
+                ▲
+                <div class="notification-badge" id="notificationBadge">0</div>
+            </div>
+            <div class="notification-dropdown" id="notificationDropdown">
+                <div class="notification-header">NOTIFICATIONS</div>
+                <div id="notificationList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTAINER -->
+    <div class="container">
+        <!-- LEFT SIDEBAR -->
+        <div class="left-sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">TIME RANGE</div>
+                <div class="sidebar-item active" data-filter="time" data-value="1h">
+                    <div class="filter-checkbox checked">✓</div>
+                    <span>LAST HOUR</span>
+                </div>
+                <div class="sidebar-item" data-filter="time" data-value="24h">
+                    <div class="filter-checkbox">✓</div>
+                    <span>LAST 24H</span>
+                </div>
+                <div class="sidebar-item" data-filter="time" data-value="7d">
+                    <div class="filter-checkbox"></div>
+                    <span>LAST 7 DAYS</span>
+                </div>
+                <div class="sidebar-item" data-filter="time" data-value="30d">
+                    <div class="filter-checkbox"></div>
+                    <span>LAST 30 DAYS</span>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">SCANNER TYPE</div>
+                <div class="sidebar-item" data-filter="scanner" data-value="bluetooth">
+                    <div class="filter-checkbox checked">✓</div>
+                    <div class="sidebar-icon">◉</div>
+                    <span>BLUETOOTH</span>
+                </div>
+                <div class="sidebar-item" data-filter="scanner" data-value="wifi">
+                    <div class="filter-checkbox"></div>
+                    <div class="sidebar-icon">◈</div>
+                    <span>WIFI</span>
+                </div>
+                <div class="sidebar-item" data-filter="scanner" data-value="rf">
+                    <div class="filter-checkbox"></div>
+                    <div class="sidebar-icon">◎</div>
+                    <span>RF-SPECTRUM</span>
+                </div>
+                <div class="sidebar-item" data-filter="scanner" data-value="zigbee">
+                    <div class="filter-checkbox"></div>
+                    <div class="sidebar-icon">◇</div>
+                    <span>ZIGBEE</span>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">DEVICE TYPE</div>
+                <div class="sidebar-item" data-filter="device" data-value="smartphone">
+                    <div class="filter-checkbox checked">✓</div>
+                    <div class="sidebar-icon">▣</div>
+                    <span>SMARTPHONES</span>
+                </div>
+                <div class="sidebar-item" data-filter="device" data-value="headset">
+                    <div class="filter-checkbox checked">✓</div>
+                    <div class="sidebar-icon">◐</div>
+                    <span>HEADSETS</span>
+                </div>
+                <div class="sidebar-item" data-filter="device" data-value="wearable">
+                    <div class="filter-checkbox"></div>
+                    <div class="sidebar-icon">◧</div>
+                    <span>WEARABLES</span>
+                </div>
+                <div class="sidebar-item" data-filter="device" data-value="unknown">
+                    <div class="filter-checkbox"></div>
+                    <div class="sidebar-icon">◻</div>
+                    <span>UNKNOWN</span>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">STATUS</div>
+                <div class="sidebar-item" data-filter="status" data-value="online">
+                    <div class="status-indicator"></div>
+                    <span>ONLINE</span>
+                </div>
+                <div class="sidebar-item" data-filter="status" data-value="offline">
+                    <div class="status-indicator inactive"></div>
+                    <span>OFFLINE</span>
+                </div>
+                <div class="sidebar-item" data-filter="status" data-value="watchlist">
+                    <div class="status-indicator alert"></div>
+                    <span>WATCHLIST</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div class="main-content">
+            <!-- HOME VIEW -->
+            <div id="view-home" class="content-view active">
+                <div class="content-header">
+                    <div class="page-title">DASHBOARD OVERVIEW</div>
+                    <div class="page-subtitle">SYSTEM STATUS // ALL SCANNERS</div>
+                </div>
+
+                <div class="content-body">
+                    <!-- Scanner Status Cards -->
+                    <div class="cards-grid">
+                        <div class="card" id="card-bluetooth">
+                            <div class="card-icon">◉</div>
+                            <div class="card-title">BLUETOOTH</div>
+                            <div class="card-description">BT SCANNER STATUS</div>
+                            <div class="card-value" id="bt-count">0</div>
+                            <div class="card-status" id="bt-status">OFFLINE</div>
+                        </div>
+                        <div class="card" id="card-wifi">
+                            <div class="card-icon">◈</div>
+                            <div class="card-title">WIFI</div>
+                            <div class="card-description">WIFI SCANNER STATUS</div>
+                            <div class="card-value" id="wifi-count">0</div>
+                            <div class="card-status" id="wifi-status">OFFLINE</div>
+                        </div>
+                        <div class="card" id="card-rf">
+                            <div class="card-icon">◎</div>
+                            <div class="card-title">RF-SPECTRUM</div>
+                            <div class="card-description">RF SCANNER STATUS</div>
+                            <div class="card-value" id="rf-count">0</div>
+                            <div class="card-status" id="rf-status">OFFLINE</div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity -->
+                    <div class="section-header">RECENT ACTIVITY</div>
+                    <table class="data-table" id="recent-activity">
+                        <thead>
+                            <tr>
+                                <th>TIMESTAMP</th>
+                                <th>MAC ADDRESS</th>
+                                <th>DEVICE NAME</th>
+                                <th>SCANNER</th>
+                                <th>STATUS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activity-body">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: #666;">NO RECENT ACTIVITY</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SCAN VIEW -->
+            <div id="view-scan" class="content-view">
+                <div class="content-header">
+                    <div class="page-title">SCANNER CONTROL</div>
+                    <div class="page-subtitle">START/STOP SCANNERS // CONFIGURE PARAMETERS</div>
+                </div>
+
+                <div class="content-body">
+                    <div class="scanner-controls">
+                        <div class="scanner-control-card">
+                            <div class="scanner-control-header">
+                                <span class="scanner-control-icon">◉</span>
+                                <span>BLUETOOTH SCANNER</span>
+                            </div>
+                            <div class="scanner-control-body">
+                                <button class="btn-primary" onclick="startScanner('bluetooth')">
+                                    ▶ START SCAN
+                                </button>
+                                <button class="btn-secondary" onclick="stopScanner('bluetooth')">
+                                    ■ STOP SCAN
+                                </button>
+                            </div>
+                            <div class="scanner-control-status" id="bt-scanner-status">
+                                ● IDLE
+                            </div>
+                        </div>
+
+                        <div class="scanner-control-card">
+                            <div class="scanner-control-header">
+                                <span class="scanner-control-icon">◈</span>
+                                <span>WIFI SCANNER</span>
+                            </div>
+                            <div class="scanner-control-body">
+                                <button class="btn-primary" onclick="startScanner('wifi')">
+                                    ▶ START SCAN
+                                </button>
+                                <button class="btn-secondary" onclick="stopScanner('wifi')">
+                                    ■ STOP SCAN
+                                </button>
+                            </div>
+                            <div class="scanner-control-status" id="wifi-scanner-status">
+                                ● IDLE
+                            </div>
+                        </div>
+
+                        <div class="scanner-control-card">
+                            <div class="scanner-control-header">
+                                <span class="scanner-control-icon">◎</span>
+                                <span>RF SCANNER</span>
+                            </div>
+                            <div class="scanner-control-body">
+                                <button class="btn-primary" onclick="startScanner('rf')">
+                                    ▶ START SCAN
+                                </button>
+                                <button class="btn-secondary" onclick="stopScanner('rf')">
+                                    ■ STOP SCAN
+                                </button>
+                            </div>
+                            <div class="scanner-control-status" id="rf-scanner-status">
+                                ● IDLE
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATS VIEW -->
+            <div id="view-stats" class="content-view">
+                <div class="content-header">
+                    <div class="page-title">STATISTICS</div>
+                    <div class="page-subtitle">DEVICE ANALYTICS // ACTIVITY PATTERNS</div>
+                </div>
+                <div class="content-body">
+                    <!-- Time Filter -->
+                    <div class="section-header">TIME FILTER</div>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 2rem;">
+                        <button class="btn-secondary time-filter-btn active" data-filter="all" onclick="setStatsFilter('all')">
+                            ALL TIME
+                        </button>
+                        <button class="btn-secondary time-filter-btn" data-filter="24h" onclick="setStatsFilter('24h')">
+                            LAST 24H
+                        </button>
+                        <button class="btn-secondary time-filter-btn" data-filter="7d" onclick="setStatsFilter('7d')">
+                            LAST 7 DAYS
+                        </button>
+                        <button class="btn-secondary time-filter-btn" data-filter="30d" onclick="setStatsFilter('30d')">
+                            LAST 30 DAYS
+                        </button>
+                    </div>
+
+                    <!-- Overview Cards -->
+                    <div class="section-header">OVERVIEW</div>
+                    <div class="cards-grid" id="stats-overview">
+                        <div class="card">
+                            <div class="card-icon">◇</div>
+                            <div class="card-title">TOTAL SCANS</div>
+                            <div class="card-value" id="stat-total">0</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">◈</div>
+                            <div class="card-title">UNIQUE DEVICES</div>
+                            <div class="card-value" id="stat-unique">0</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">◎</div>
+                            <div class="card-title">LAST 24H</div>
+                            <div class="card-value" id="stat-24h">0</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">◉</div>
+                            <div class="card-title">LAST HOUR</div>
+                            <div class="card-value" id="stat-1h">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Top Devices -->
+                    <div class="section-header" style="margin-top: 2rem;">TOP DEVICES</div>
+                    <table class="data-table" id="stats-top-devices">
+                        <thead>
+                            <tr>
+                                <th>RANK</th>
+                                <th>MAC ADDRESS</th>
+                                <th>DEVICE NAME</th>
+                                <th>COUNT</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stats-top-devices-body">
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: #666;">LOADING...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- Hourly Activity Chart -->
+                    <div class="section-header" style="margin-top: 2rem;">HOURLY ACTIVITY</div>
+                    <div style="background: var(--bg-secondary); border: 1px solid var(--border-primary); padding: 1.5rem; margin-bottom: 1.5rem;">
+                        <canvas id="stats-hourly-chart" width="800" height="300"></canvas>
+                    </div>
+
+                    <!-- Advanced Stats -->
+                    <div class="section-header" style="margin-top: 2rem;">ADVANCED STATISTICS</div>
+                    <div class="cards-grid" id="stats-advanced">
+                        <div class="card">
+                            <div class="card-title">TIMESPAN</div>
+                            <div class="card-value" id="stat-timespan">0</div>
+                            <div class="card-description">DAYS</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">AVG SCANS/DEVICE</div>
+                            <div class="card-value" id="stat-avg">0</div>
+                            <div class="card-description">AVERAGE</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">MEDIAN SCANS</div>
+                            <div class="card-value" id="stat-median">0</div>
+                            <div class="card-description">MEDIAN</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">24H GROWTH</div>
+                            <div class="card-value" id="stat-growth">0%</div>
+                            <div class="card-description">TREND</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LOGS VIEW -->
+            <div id="view-logs" class="content-view">
+                <div class="content-header">
+                    <div class="page-title">LOGS</div>
+                </div>
+                <div class="content-body">
+                    <p style="color: #666;">Logs view coming soon...</p>
+                </div>
+            </div>
+
+            <!-- MAP VIEW -->
+            <div id="view-map" class="content-view">
+                <div class="content-header">
+                    <div class="page-title">GPS MAP</div>
+                </div>
+                <div class="content-body">
+                    <p style="color: #666;">Map view coming soon...</p>
+                </div>
+            </div>
+
+            <!-- SETTINGS VIEW -->
+            <div id="view-settings" class="content-view">
+                <div class="content-header">
+                    <div class="page-title">SETTINGS</div>
+                </div>
+                <div class="content-body">
+                    <p style="color: #666;">Settings view coming soon...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

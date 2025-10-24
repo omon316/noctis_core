@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoctisCore - Logs</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/noctis.css') }}">
+</head>
+<body>
+    <!-- TOP NAVIGATION -->
+    <nav class="top-nav">
+        <!-- Logo -->
+        <div class="logo">
+            <div class="logo-icon">
+                <div class="logo-circle"></div>
+                <div class="logo-circle"></div>
+            </div>
+            <span>NoctisCore</span>
+        </div>
+
+        <!-- Navigation Items -->
+        <div class="nav-items">
+            <a href="/" class="nav-item">HOME</a>
+            <a href="/stats" class="nav-item">STATS</a>
+            <a href="/logs" class="nav-item active">LOGS</a>
+            <a href="/map" class="nav-item">MAP</a>
+            <a href="/watch" class="nav-item">WATCH</a>
+            <a href="/export" class="nav-item">EXPORT</a>
+        </div>
+
+        <!-- Right Side -->
+        <div class="nav-right">
+            <!-- Search -->
+            <div class="search-container">
+                <input type="text" class="search-input" placeholder="Search...">
+                <span class="search-icon">◉</span>
+            </div>
+
+            <!-- Notifications -->
+            <div class="notification-container">
+                <div class="notification-bell">
+                    ▲
+                    <span class="notification-badge">0</span>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <button class="icon-btn">◆</button>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTAINER -->
+    <div class="main-container">
+        <!-- LEFT SIDEBAR -->
+        <aside class="sidebar">
+            <!-- Quick Stats -->
+            <div class="sidebar-section">
+                <div class="sidebar-title">QUICK STATS</div>
+                <div class="system-info">
+                    <div class="info-row">
+                        <span>Total Logs:</span>
+                        <span class="text-cyan">--</span>
+                    </div>
+                    <div class="info-row">
+                        <span>Last 24h:</span>
+                        <span>--</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="content">
+            <!-- Header -->
+            <div class="content-header">
+                <h1 class="page-title">LOGS VIEWER</h1>
+                <div class="header-actions">
+                    <button class="btn-secondary">
+                        <span>⟲</span> REFRESH
+                    </button>
+                </div>
+            </div>
+
+            <!-- Placeholder -->
+            <div class="content-section">
+                <div style="text-align: center; padding: 4rem 2rem; color: var(--text-secondary);">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
+                    <h2 style="font-size: 1.5rem; margin-bottom: 1rem; color: var(--accent-cyan);">LOGS MODUL - COMING SOON</h2>
+                    <p style="margin-bottom: 2rem;">
+                        Das LOGS-Modul wird aktuell entwickelt.<br>
+                        Es zeigt alle Scan-Logs mit Filtern, Suche und Export.
+                    </p>
+                    <div style="background: var(--bg-secondary); border: 1px solid var(--border-primary); padding: 2rem; text-align: left; max-width: 600px; margin: 0 auto;">
+                        <div style="font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.1em;">Geplante Features:</div>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin-bottom: 0.5rem;">✓ Log-Viewer mit Pagination</li>
+                            <li style="margin-bottom: 0.5rem;">✓ Time Filter (24h, 7d, 30d)</li>
+                            <li style="margin-bottom: 0.5rem;">✓ Full-Text Search</li>
+                            <li style="margin-bottom: 0.5rem;">✓ MAC Filter</li>
+                            <li style="margin-bottom: 0.5rem;">✓ Export (CSV/JSON)</li>
+                            <li style="margin-bottom: 0.5rem;">✓ Real-time Updates</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
