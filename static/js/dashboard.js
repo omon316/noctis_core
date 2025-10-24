@@ -13,37 +13,12 @@ const state = {
         time: '24h',
         scanner: ['bluetooth'],
         device: ['smartphone', 'headset'],
-        status: []
+        status: []dashboard
     },
     devices: [],
     notifications: [],
     startTime: null
 };
-
-// ========================= INITIALIZATION =========================
-
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('NoctisCore Dashboard initialized');
-    
-    // Initialize event listeners
-    initNavigation();
-    initScannerControl();
-    initSearch();
-    initNotifications();
-    initFilters();
-    
-    // Start status polling
-    pollStatus();
-    
-    // Start uptime counter
-    updateUptime();
-    setInterval(updateUptime, 1000);
-});
-
-// ========================= NAVIGATION =========================
-
-function initNavigation() {
-    const navItems = document.querySelectorAll('.nav-item');
     
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
